@@ -69,6 +69,7 @@ in.
 * `Foreground2`
 
 Here's an example:
+
     [ChameleonDesktop]
     Measure=Plugin
     Plugin=Chameleon
