@@ -1,5 +1,6 @@
 #include <vector>
 #include <memory>
+#include <string>
 
 #include <Windows.h>
 #include <VersionHelpers.h>
@@ -47,16 +48,18 @@ struct Image
 	bool dirty;
 	bool forceIcon;
 
-	std::wstring bg1;
-	std::wstring bg2;
-	std::wstring fg1;
-	std::wstring fg2;
+	uint32_t bg1;
+	uint32_t bg2;
+	uint32_t fg1;
+	uint32_t fg2;
 };
 
 struct Measure
 {
 	MeasureType type;
 	std::shared_ptr<Image> parent;
+	bool useHex;
+	std::wstring value;
 };
 
 /*
@@ -298,8 +301,6 @@ void SampleImage(std::shared_ptr<Image> img)
 {
 	HRESULT r = CoInitializeEx(NULL, COINIT_SPEED_OVER_MEMORY);
 
-	uint32_t bg1 = 0, bg2 = 0, fg1 = 0, fg2 = 0;
-
 	bool isIcon = false;
 
 	// If we're sampling the desktop, grab that
@@ -389,22 +390,10 @@ void SampleImage(std::shared_ptr<Image> img)
 		// Special case! User doesn't have a background image:
 		if (img->path.length() == 0)
 		{
-			bg1 = _byteswap_ulong(GetSysColor(COLOR_ACTIVECAPTION)) | 0xFF;
-			bg2 = _byteswap_ulong(GetSysColor(COLOR_INACTIVECAPTION)) | 0xFF;
-			fg1 = _byteswap_ulong(GetSysColor(COLOR_CAPTIONTEXT)) | 0xFF;
-			fg2 = _byteswap_ulong(GetSysColor(COLOR_INACTIVECAPTIONTEXT)) | 0xFF;
-
-			img->bg1.clear();
-			for (size_t i = 0; i < 6; ++i) { img->bg1 += whex[(bg1 >> (28 - 4 * i)) & 0x0F]; }
-
-			img->bg2.clear();
-			for (size_t i = 0; i < 6; ++i) { img->bg2 += whex[(bg2 >> (28 - 4 * i)) & 0x0F]; }
-
-			img->fg1.clear();
-			for (size_t i = 0; i < 6; ++i) { img->fg1 += whex[(fg1 >> (28 - 4 * i)) & 0x0F]; }
-
-			img->fg2.clear();
-			for (size_t i = 0; i < 6; ++i) { img->fg2 += whex[(fg2 >> (28 - 4 * i)) & 0x0F]; }
+			img->bg1 = _byteswap_ulong(GetSysColor(COLOR_ACTIVECAPTION)) | 0xFF;
+			img->bg2 = _byteswap_ulong(GetSysColor(COLOR_INACTIVECAPTION)) | 0xFF;
+			img->fg1 = _byteswap_ulong(GetSysColor(COLOR_CAPTIONTEXT)) | 0xFF;
+			img->fg2 = _byteswap_ulong(GetSysColor(COLOR_INACTIVECAPTIONTEXT)) | 0xFF;
 
 			img->dirty = false;
 		}
@@ -415,8 +404,8 @@ void SampleImage(std::shared_ptr<Image> img)
 		if (img->path.empty())
 		{
 			// Empty path! Let's dump some default values and be done with it...
-			img->bg1 = img->bg2 = L"FFFFFF";
-			img->fg1 = img->fg2 = L"000000";
+			img->bg1 = img->bg2 = 0xFFFFFFFF;
+			img->fg1 = img->fg2 = 0x000000FF;
 			img->dirty = false;
 
 			if (r == S_OK || r == S_FALSE)
@@ -478,8 +467,8 @@ void SampleImage(std::shared_ptr<Image> img)
 				if (imgData == nullptr && w == -1)
 				{
 					// Something goofed, don't bother continuing
-					img->bg1 = img->bg2 = L"FFFFFF";
-					img->fg1 = img->fg2 = L"000000";
+					img->bg1 = img->bg2 = 0xFFFFFFFF;
+					img->fg1 = img->fg2 = 0x000000FF;
 					img->dirty = false;
 					if (r == S_OK || r == S_FALSE)
 					{
@@ -504,8 +493,8 @@ void SampleImage(std::shared_ptr<Image> img)
 				if (imgData == nullptr)
 				{
 					// It's something we don't actually know how to handle, so let's not.
-					img->bg1 = img->bg2 = L"FFFFFF";
-					img->fg1 = img->fg2 = L"000000";
+					img->bg1 = img->bg2 = 0xFFFFFFFF;
+					img->fg1 = img->fg2 = 0x000000FF;
 					img->dirty = false;
 					if (r == S_OK || r == S_FALSE)
 					{
@@ -543,22 +532,10 @@ void SampleImage(std::shared_ptr<Image> img)
 		}
 
 		// Swap the colors because the byte ordering is opposite that of what we want to give Rainmeter...
-		bg1 = _byteswap_ulong(chameleonGetColor(chameleon, CHAMELEON_BACKGROUND1)) | 0xFF;
-		bg2 = _byteswap_ulong(chameleonGetColor(chameleon, CHAMELEON_BACKGROUND2)) | 0xFF;
-		fg1 = _byteswap_ulong(chameleonGetColor(chameleon, CHAMELEON_FOREGROUND1)) | 0xFF;
-		fg2 = _byteswap_ulong(chameleonGetColor(chameleon, CHAMELEON_FOREGROUND2)) | 0xFF;
-
-		img->bg1.clear();
-		for (size_t i = 0; i < 8; ++i) { img->bg1 += whex[(bg1 >> (28 - 4 * i)) & 0x0F]; }
-
-		img->bg2.clear();
-		for (size_t i = 0; i < 8; ++i) { img->bg2 += whex[(bg2 >> (28 - 4 * i)) & 0x0F]; }
-
-		img->fg1.clear();
-		for (size_t i = 0; i < 8; ++i) { img->fg1 += whex[(fg1 >> (28 - 4 * i)) & 0x0F]; }
-
-		img->fg2.clear();
-		for (size_t i = 0; i < 8; ++i) { img->fg2 += whex[(fg2 >> (28 - 4 * i)) & 0x0F]; }
+		img->bg1 = _byteswap_ulong(chameleonGetColor(chameleon, CHAMELEON_BACKGROUND1)) | 0xFF;
+		img->bg2 = _byteswap_ulong(chameleonGetColor(chameleon, CHAMELEON_BACKGROUND2)) | 0xFF;
+		img->fg1 = _byteswap_ulong(chameleonGetColor(chameleon, CHAMELEON_FOREGROUND1)) | 0xFF;
+		img->fg2 = _byteswap_ulong(chameleonGetColor(chameleon, CHAMELEON_FOREGROUND2)) | 0xFF;
 
 		destroyChameleon(chameleon);
 		chameleon = nullptr;
@@ -696,6 +673,23 @@ PLUGIN_EXPORT void Reload(void *data, void *rm, double *maxVal)
 						return;
 					}
 
+					std::wstring useHex = RmReadString(rm, L"Format", L"Hex");
+
+					if (useHex.compare(L"Hex") == 0)
+					{
+						measure->useHex = true;
+					}
+					else if (useHex.compare(L"Dec") == 0)
+					{
+						measure->useHex = false;
+					}
+					else
+					{
+						measure->useHex = true;
+						RmLog(LOG_ERROR, L"Chameleon: Invalid Format=");
+						return;
+					}
+
 					return;
 				}
 			}
@@ -731,6 +725,43 @@ PLUGIN_EXPORT double Update(void *data)
 
 		SampleImage(measure->parent);
 	}
+	else
+	{
+		// We're updating a child measure, it just needs to format the value from the parent
+		uint32_t value = 0;
+
+		// Choose the right value
+		switch (measure->type)
+		{
+		case MEASURE_BG1:
+			value = measure->parent->bg1;
+			break;
+		case MEASURE_BG2:
+			value = measure->parent->bg2;
+			break;
+		case MEASURE_FG1:
+			value = measure->parent->fg1;
+			break;
+		case MEASURE_FG2:
+			value = measure->parent->fg2;
+			break;
+		}
+
+		// Lop off the alpha
+		value >>= 8;
+
+		measure->value.clear();
+
+		// Which format?
+		if (measure->useHex)
+		{
+			for (size_t i = 0; i < 6; ++i) { measure->value += whex[(value >> (20 - 4 * i)) & 0x0F]; }
+		}
+		else
+		{
+			measure->value = std::to_wstring((value >> 16) & 0xFF) + L"," + std::to_wstring((value >> 8) & 0xFF) + L"," + std::to_wstring(value & 0xFF);
+		}
+	}
 
 	// This plugin only returns strings so...
 	return 0;
@@ -754,19 +785,7 @@ PLUGIN_EXPORT LPCWSTR GetString(void *data)
 	}
 	else
 	{
-		switch (measure->type)
-		{
-		case MEASURE_BG1:
-			return img->bg1.c_str();
-		case MEASURE_BG2:
-			return img->bg2.c_str();
-		case MEASURE_FG1:
-			return img->fg1.c_str();
-		case MEASURE_FG2:
-			return img->fg2.c_str();
-		}
-
-		return nullptr;
+		return measure->value.c_str();
 	}
 }
 
