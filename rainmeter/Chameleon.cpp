@@ -395,16 +395,16 @@ void SampleImage(std::shared_ptr<Image> img)
 			fg2 = _byteswap_ulong(GetSysColor(COLOR_INACTIVECAPTIONTEXT)) | 0xFF;
 
 			img->bg1.clear();
-			for (size_t i = 0; i < 8; ++i) { img->bg1 += whex[(bg1 >> (28 - 4 * i)) & 0x0F]; }
+			for (size_t i = 0; i < 6; ++i) { img->bg1 += whex[(bg1 >> (28 - 4 * i)) & 0x0F]; }
 
 			img->bg2.clear();
-			for (size_t i = 0; i < 8; ++i) { img->bg2 += whex[(bg2 >> (28 - 4 * i)) & 0x0F]; }
+			for (size_t i = 0; i < 6; ++i) { img->bg2 += whex[(bg2 >> (28 - 4 * i)) & 0x0F]; }
 
 			img->fg1.clear();
-			for (size_t i = 0; i < 8; ++i) { img->fg1 += whex[(fg1 >> (28 - 4 * i)) & 0x0F]; }
+			for (size_t i = 0; i < 6; ++i) { img->fg1 += whex[(fg1 >> (28 - 4 * i)) & 0x0F]; }
 
 			img->fg2.clear();
-			for (size_t i = 0; i < 8; ++i) { img->fg2 += whex[(fg2 >> (28 - 4 * i)) & 0x0F]; }
+			for (size_t i = 0; i < 6; ++i) { img->fg2 += whex[(fg2 >> (28 - 4 * i)) & 0x0F]; }
 
 			img->dirty = false;
 		}
@@ -415,8 +415,8 @@ void SampleImage(std::shared_ptr<Image> img)
 		if (img->path.empty())
 		{
 			// Empty path! Let's dump some default values and be done with it...
-			img->bg1 = img->bg2 = L"FFFFFFFF";
-			img->fg1 = img->fg2 = L"000000FF";
+			img->bg1 = img->bg2 = L"FFFFFF";
+			img->fg1 = img->fg2 = L"000000";
 			img->dirty = false;
 
 			if (r == S_OK || r == S_FALSE)
@@ -478,8 +478,8 @@ void SampleImage(std::shared_ptr<Image> img)
 				if (imgData == nullptr && w == -1)
 				{
 					// Something goofed, don't bother continuing
-					img->bg1 = img->bg2 = L"FFFFFFFF";
-					img->fg1 = img->fg2 = L"000000FF";
+					img->bg1 = img->bg2 = L"FFFFFF";
+					img->fg1 = img->fg2 = L"000000";
 					img->dirty = false;
 					if (r == S_OK || r == S_FALSE)
 					{
@@ -504,8 +504,8 @@ void SampleImage(std::shared_ptr<Image> img)
 				if (imgData == nullptr)
 				{
 					// It's something we don't actually know how to handle, so let's not.
-					img->bg1 = img->bg2 = L"FFFFFFFF";
-					img->fg1 = img->fg2 = L"000000FF";
+					img->bg1 = img->bg2 = L"FFFFFF";
+					img->fg1 = img->fg2 = L"000000";
 					img->dirty = false;
 					if (r == S_OK || r == S_FALSE)
 					{
