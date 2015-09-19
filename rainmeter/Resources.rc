@@ -1,8 +1,8 @@
 #include <Windows.h>
 
 1 VERSIONINFO
-	FILEVERSION 1,0,0,0
-	PRODUCTVERSION 1,0,0,0
+	FILEVERSION 1,1,0,0
+	PRODUCTVERSION 1,1,0,0
 	FILEFLAGSMASK VS_FFI_FILEFLAGSMASK
 	FILEFLAGS 0
 	FILEOS VOS_NT
@@ -14,12 +14,12 @@
 			BEGIN
 				VALUE "Comments", "Chameleon plugin for Rainmeter"
 				VALUE "CompanyName", "Socks the Fox"
-				VALUE "FileVersion", "1.0"
+				VALUE "FileVersion", "1.1"
 				VALUE "InternalName", "Chameleon"
 				VALUE "LegalCopyright", "(c) 2015 Socks the Fox"
 				VALUE "OriginalFilename", "Chameleon.dll"
 				VALUE "ProductName", "Chameleon plugin for Rainmeter"
-				VALUE "ProductVersion", "1.0"
+				VALUE "ProductVersion", "1.1"
 			END
 		END
 		BLOCK "VarFileInfo"

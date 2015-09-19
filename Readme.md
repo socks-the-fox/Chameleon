@@ -22,17 +22,18 @@ Currently it supports the following formats directly:
 
 Anything else, and it'll grab the icon and use the colors
 from that. This does mean that it also supports .ico and
-.exe icon sampling! Unfortunately Rainmeter doesn't
-support displaying icons at the time this was written so
-you'll still need to figure that out on your own. Sorry!
+.exe icon sampling! Sampling from icons is a bit roundabout,
+check out the FileView plugin for how to get them from a .exe.
 
-Installing Chameleon is a bit different from what Rainmeter
-normally does. Since my intent is to have it be used by a
-number of skins, I prefer it to be installed directly to
-the Rainmeter `Plugins` folder. No point in having 6 copies
-of the same DLL all running at once! As such, you'll need
-to pick the correct architecture (x64 if you use 64-bit
-Rainmeter, x86 if you use 32-bit) and copy it over yourself.
+If you're downloading this from my site, installing Chameleon
+is as simple as installing the example .rmskin. Rainmeter will
+stash everything where it's supposed to go for you. If you're
+grabbing this from GitHub you should be able to compile the
+solution after excluding the test app from the build process.
+If you *do* want to build the test app you'll just need to
+compile the latest build of wxWidgets and update that
+project's directories to point it there. I'm sure if you're
+compiling Chameleon yourself you already know how to install it.
 
 Using Chameleon is really simple! You can set it to
 either sample from the desktop or directly from a specific
@@ -52,6 +53,18 @@ as well. *This can be the output of another measure!*
 Optionally you can tell Chameleon to always sample from a file
 as an icon using the `ForceIcon` parameter (such as if you
 have a .png version of an icon).
+
+You can also optionally tell Chameleon whether you want these
+values as `Hex` (the default) or `Dec` (to get the numerical
+values).
+
+One last optional option is to tell Chameleon what fallback
+colors to use when it just can't sample from an image (such
+as with the NowPlaying measure's album art). Right now this
+can only be specified in hex, and should not include the
+alpha value. You can specify this with `FallbackXYZ` where
+`XYZ` is one of `BG1`, `BG2`, `FG1`, or `FG2` for it's
+respective color.
 
 Parent measures also offer the super-sneaky bonus of returning
 the path of the image it's sampling from!
@@ -85,9 +98,10 @@ In this case, `[ChameleonDesktop]` would return the wallpaper
 the skin is currently sitting on, and `[DesktopBG1]` would
 return the color Chameleon thinks is the main background.
 
-Note: Currently Chameleon returns this color with the Alpha
-set to `FF` to make it a solid opaque color. I may change this
-in the future if people want it!
+Chameleon does not add an alpha value to the color codes!
+You'll need to add this yourself to tell Rainmeter how
+transparent you want the color. By default, just adding
+`FF` after wherever you use the measure value works.
 
 Another case users might be interested in is having a meter
 colored based on the NowPlaying album art image. This is
@@ -101,3 +115,5 @@ super easy to set up too!
 
 That's it! Everything else will automatically update, as long
 as you've set DynamicVariables=1 on the apropriate meters.
+
+Check out the example skin `Socks` to see everything in action!
