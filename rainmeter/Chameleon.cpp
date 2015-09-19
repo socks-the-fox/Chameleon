@@ -52,6 +52,11 @@ struct Image
 	uint32_t bg2;
 	uint32_t fg1;
 	uint32_t fg2;
+
+	uint32_t fallback_bg1;
+	uint32_t fallback_bg2;
+	uint32_t fallback_fg1;
+	uint32_t fallback_fg2;
 };
 
 struct Measure
@@ -404,8 +409,10 @@ void SampleImage(std::shared_ptr<Image> img)
 		if (img->path.empty())
 		{
 			// Empty path! Let's dump some default values and be done with it...
-			img->bg1 = img->bg2 = 0xFFFFFFFF;
-			img->fg1 = img->fg2 = 0x000000FF;
+			img->bg1 = img->fallback_bg1;
+			img->bg2 = img->fallback_bg2;
+			img->fg1 = img->fallback_fg1;
+			img->fg2 = img->fallback_fg2;
 			img->dirty = false;
 
 			if (r == S_OK || r == S_FALSE)
@@ -467,8 +474,10 @@ void SampleImage(std::shared_ptr<Image> img)
 				if (imgData == nullptr && w == -1)
 				{
 					// Something goofed, don't bother continuing
-					img->bg1 = img->bg2 = 0xFFFFFFFF;
-					img->fg1 = img->fg2 = 0x000000FF;
+					img->bg1 = img->fallback_bg1;
+					img->bg2 = img->fallback_bg2;
+					img->fg1 = img->fallback_fg1;
+					img->fg2 = img->fallback_fg2;
 					img->dirty = false;
 					if (r == S_OK || r == S_FALSE)
 					{
@@ -493,8 +502,10 @@ void SampleImage(std::shared_ptr<Image> img)
 				if (imgData == nullptr)
 				{
 					// It's something we don't actually know how to handle, so let's not.
-					img->bg1 = img->bg2 = 0xFFFFFFFF;
-					img->fg1 = img->fg2 = 0x000000FF;
+					img->bg1 = img->fallback_bg1;
+					img->bg2 = img->fallback_bg2;
+					img->fg1 = img->fallback_fg1;
+					img->fg2 = img->fallback_fg2;
 					img->dirty = false;
 					if (r == S_OK || r == S_FALSE)
 					{
@@ -626,6 +637,48 @@ PLUGIN_EXPORT void Reload(void *data, void *rm, double *maxVal)
 		{
 			RmLog(LOG_ERROR, L"Chameleon: Invalid Type=");
 			return;
+		}
+
+		std::wstring fallbackColorStr = RmReadString(rm, L"FallbackBG1", L"FFFFFF");
+
+		// If statements are due to the fact that FallbackXXX might be specified but not initialized yet.
+		if (fallbackColorStr.empty())
+		{
+			img->fallback_bg1 = 0xFFFFFFFF;
+		}
+		else
+		{
+			img->fallback_bg1 = (std::stoi(fallbackColorStr, 0, 16) << 8) | 0xFF;
+		}
+
+		fallbackColorStr = RmReadString(rm, L"FallbackBG2", fallbackColorStr.c_str());
+		if (fallbackColorStr.empty())
+		{
+			img->fallback_bg2 = img->fallback_bg1;
+		}
+		else
+		{
+			img->fallback_bg2 = (std::stoi(fallbackColorStr, 0, 16) << 8) | 0xFF;
+		}
+
+		fallbackColorStr = RmReadString(rm, L"FallbackFG1", L"000000");
+		if (fallbackColorStr.empty())
+		{
+			img->fallback_fg1 = 0x000000FF;
+		}
+		else
+		{
+			img->fallback_fg1 = (std::stoi(fallbackColorStr, 0, 16) << 8) | 0xFF;
+		}
+
+		fallbackColorStr = RmReadString(rm, L"FallbackFG2", fallbackColorStr.c_str());
+		if (fallbackColorStr.empty())
+		{
+			img->fallback_fg2 = img->fallback_fg1;
+		}
+		else
+		{
+			img->fallback_fg2 = (std::stoi(fallbackColorStr, 0, 16) << 8) | 0xFF;
 		}
 
 		Update(data);
