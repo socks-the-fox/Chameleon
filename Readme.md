@@ -55,8 +55,8 @@ as an icon using the `ForceIcon` parameter (such as if you
 have a .png version of an icon).
 
 You can also optionally tell Chameleon whether you want these
-values as `Hex` (the default) or `Dec` (to get the numerical
-values).
+values as a hex code or a numeric color code by setting the
+`Format` option to `Hex` or `Dec`, respectively.
 
 One last optional option is to tell Chameleon what fallback
 colors to use when it just can't sample from an image (such
