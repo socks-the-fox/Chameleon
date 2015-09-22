@@ -74,6 +74,7 @@
     <IncludePath>..\..\lpng1618;..\..\rainmeter\API;..\chameleon;$(IncludePath)</IncludePath>
     <TargetName>Chameleon</TargetName>
     <LibraryPath>..\..\lpng1618\projects\vstudio\Release Library;..\..\rainmeter\API\x32;..\Release;$(LibraryPath)</LibraryPath>
+    <OutDir>$(SolutionDir)\ExampleSkin\Socks\@Resources\Plugin\$(PlatformShortName)\</OutDir>
   </PropertyGroup>
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">
     <IncludePath>..\..\lpng1618;..\..\rainmeter\API;..\chameleon;$(IncludePath)</IncludePath>
@@ -84,6 +85,7 @@
     <IncludePath>..\..\lpng1618;..\..\rainmeter\API;..\chameleon;$(IncludePath)</IncludePath>
     <LibraryPath>..\..\lpng1618\projects\vstudio\x64\Release Library;..\x64\Release;..\..\rainmeter\API\x64;$(LibraryPath)</LibraryPath>
     <TargetName>Chameleon</TargetName>
+    <OutDir>$(SolutionDir)\ExampleSkin\Socks\@Resources\Plugin\$(PlatformShortName)\</OutDir>
   </PropertyGroup>
   <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">
     <ClCompile>
@@ -119,10 +121,10 @@
       <SDLCheck>true</SDLCheck>
     </ClCompile>
     <Link>
-      <GenerateDebugInformation>true</GenerateDebugInformation>
+      <GenerateDebugInformation>false</GenerateDebugInformation>
       <EnableCOMDATFolding>true</EnableCOMDATFolding>
       <OptimizeReferences>true</OptimizeReferences>
-      <ImportLibrary>$(OutDir)rainmeterplugin.lib</ImportLibrary>
+      <ImportLibrary>$(SolutionDir)$(Configuration)\rainmeterplugin.lib</ImportLibrary>
       <AdditionalDependencies>chameleon.lib;rainmeter.lib;libpng16.lib;zlib.lib;%(AdditionalDependencies)</AdditionalDependencies>
     </Link>
   </ItemDefinitionGroup>
@@ -139,7 +141,7 @@
       <EnableCOMDATFolding>true</EnableCOMDATFolding>
       <OptimizeReferences>true</OptimizeReferences>
       <AdditionalDependencies>zlib.lib;libpng16.lib;chameleon.lib;Rainmeter.lib;%(AdditionalDependencies)</AdditionalDependencies>
-      <ImportLibrary>$(OutDir)rainmeterplugin.lib</ImportLibrary>
+      <ImportLibrary>$(SolutionDir)$(Platform)\$(Configuration)\rainmeterplugin.lib</ImportLibrary>
     </Link>
   </ItemDefinitionGroup>
   <ItemGroup>
