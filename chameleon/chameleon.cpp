@@ -262,27 +262,49 @@ void chameleonFindKeyColors(Chameleon *chameleon, const ChameleonParams *params,
 		}
 
 		// Find the contrast between the background and the foreground
-		if (contrast(&stat[fg1], &stat[bg1]) < MIN_CONTRAST)
+		float cont = contrast(&stat[fg1], &stat[bg1]);
+		// prevent infinite loops;
+		size_t loops;
+		if (cont < MIN_CONTRAST)
 		{
-			if (stat[bg1].y >= 0.5f)
+			stat[64] = stat[fg1];
+			fg1 = 64;
+			loops = 0;
+			while (cont < MIN_CONTRAST && loops < 8)
 			{
-				fg1 = 0x0000;
-			}
-			else
-			{
-				fg1 = 0x0FFF;
+				if (stat[bg1].y > 0.5f)
+				{
+					stat[fg1].rgbc = _mm_div_ps(stat[fg1].rgbc, _mm_set_ps(1, 2, 2, 2));
+				}
+				else
+				{
+					stat[fg1].rgbc = _mm_div_ps(_mm_add_ps(stat[fg1].rgbc, _mm_set_ps(0, 1, 1, 1)), _mm_set_ps(1, 2, 2, 2));
+				}
+
+				cont = contrast(&stat[fg1], &stat[bg1]);
+				loops++;
 			}
 		}
 
-		if (contrast(&stat[fg2], &stat[bg1]) < MIN_CONTRAST)
+		cont = contrast(&stat[fg2], &stat[bg1]);
+		if (cont < MIN_CONTRAST)
 		{
-			if (stat[bg1].y >= 0.5f)
+			stat[65] = stat[fg2];
+			fg2 = 65;
+			loops = 0;
+			while (cont < MIN_CONTRAST && loops < 8)
 			{
-				fg2 = 0x0000;
-			}
-			else
-			{
-				fg2 = 0x0FFF;
+				if (stat[bg1].y > 0.5f)
+				{
+					stat[fg2].rgbc = _mm_div_ps(stat[fg2].rgbc, _mm_set_ps(1, 2, 2, 2));
+				}
+				else
+				{
+					stat[fg2].rgbc = _mm_div_ps(_mm_add_ps(stat[fg2].rgbc, _mm_set_ps(0, 1, 1, 1)), _mm_set_ps(1, 2, 2, 2));
+				}
+
+				cont = contrast(&stat[fg2], &stat[bg1]);
+				loops++;
 			}
 		}
 	}
