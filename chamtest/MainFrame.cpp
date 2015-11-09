@@ -5,6 +5,7 @@
 #include <wx/wfstream.h>
 
 #include <chameleon.h>
+#include <chameleon_internal.h>
 
 #include "MainFrame.h"
 
@@ -110,7 +111,7 @@ void MainFrame::onFileOpen(wxCommandEvent &e)
 
 		for (size_t i = 0; i < w*h; ++i)
 		{
-			imgData[i] = (wxImgData[i * 3 + 2] << 16) | (wxImgData[i * 3 + 1] << 8) | (wxImgData[i * 3 + 0] << 0);
+			imgData[i] = 0xFF000000 | (wxImgData[i * 3 + 2] << 16) | (wxImgData[i * 3 + 1] << 8) | (wxImgData[i * 3 + 0] << 0);
 		}
 
 		std::cout << "Processing image..." << std::endl;
@@ -127,10 +128,31 @@ void MainFrame::onFileOpen(wxCommandEvent &e)
 		cp3->SetBackgroundColour(wxColor(chameleonGetColor(chameleon, CHAMELEON_FOREGROUND1)));
 		cp4->SetBackgroundColour(wxColor(chameleonGetColor(chameleon, CHAMELEON_FOREGROUND2)));
 
+		wxMilliClock_t end = wxGetLocalTimeMillis();
+
+		std::cout << "Processed image in " << (end - start) << "ms." << std::endl;
+
+		for (size_t y = 0; y < h; ++y)
+		{
+			for (size_t x = 0; x < w; ++x)
+			{
+				uint16_t ci = XRGB5(imgData[x + (y * w)]);
+
+				if (ci != 0 && (chameleon->colors[ci].r + chameleon->colors[ci].g + chameleon->colors[ci].b) == 0)
+				{
+					wxMessageBox("oops");
+				}
+				else if (chameleon->colors[ci].r > 1 || chameleon->colors[ci].g > 1 || chameleon->colors[ci].b > 1)
+				{
+					wxMessageBox("oops 2");
+				}
+
+				img->SetRGB(x, y, chameleon->colors[ci].r * 255, chameleon->colors[ci].g * 255, chameleon->colors[ci].b * 255);
+			}
+		}
+
 		destroyChameleon(chameleon);
 		chameleon = nullptr;
-
-		std::cout << "Processed image in " << (wxGetLocalTimeMillis() - start) << "ms." << std::endl;
 
 		delete[] imgData;
 
