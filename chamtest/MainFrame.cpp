@@ -75,6 +75,10 @@ MainFrame::~MainFrame()
 		delete img;
 	}
 
+	if (chameleon != nullptr)
+	{
+		destroyChameleon(chameleon);
+	}
 }
 
 void MainFrame::onFileQuit(wxCommandEvent &e)
@@ -118,7 +122,7 @@ void MainFrame::onFileOpen(wxCommandEvent &e)
 		std::cout << "Processing image..." << std::endl;
 		wxMilliClock_t start = wxGetLocalTimeMillis();
 
-		if (chameleon)
+		if (chameleon != nullptr)
 		{
 			destroyChameleon(chameleon);
 			chameleon = nullptr;
@@ -189,13 +193,9 @@ void MainFrame::onPaint(wxPaintEvent &e)
 
 		wxRect csize = imgPanel->GetClientRect();
 
-		float scalebase = (csize.width < csize.height ? csize.width : csize.height);
-
-		float scale = 1.0f;
-		if (w > scalebase || h > scalebase)
-		{
-			scale = (w > h ? scalebase / w : scalebase / h);
-		}
+		float scalew = (float) csize.width / w;
+		float scaleh = (float) csize.height / h;
+		float scale = (scalew > scaleh)? scaleh : scalew;
 
 		w *= scale;
 		h *= scale;
