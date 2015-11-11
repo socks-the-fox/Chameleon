@@ -1,3 +1,5 @@
+struct Chameleon;
+
 class MainFrame : public wxFrame
 {
 	wxPanel *imgPanel;
@@ -10,6 +12,8 @@ class MainFrame : public wxFrame
 	wxTextCtrl *output;
 
 	wxImage *img;
+
+	Chameleon *chameleon;
 
 	void onFileQuit(wxCommandEvent &e);
 	void onFileOpen(wxCommandEvent &e);

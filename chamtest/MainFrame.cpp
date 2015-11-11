@@ -12,6 +12,7 @@
 MainFrame::MainFrame() : wxFrame(nullptr, wxID_ANY, "Chameleon Test App")
 {
 	img = nullptr;
+	chameleon = nullptr;
 
 	wxMenuBar *menuBar = new wxMenuBar();
 	wxMenu *file = new wxMenu();
@@ -117,7 +118,12 @@ void MainFrame::onFileOpen(wxCommandEvent &e)
 		std::cout << "Processing image..." << std::endl;
 		wxMilliClock_t start = wxGetLocalTimeMillis();
 
-		Chameleon *chameleon = createChameleon();
+		if (chameleon)
+		{
+			destroyChameleon(chameleon);
+			chameleon = nullptr;
+		}
+		chameleon = createChameleon();
 
 		chameleonProcessImage(chameleon, imgData, w, h);
 
@@ -138,6 +144,7 @@ void MainFrame::onFileOpen(wxCommandEvent &e)
 			{
 				uint16_t ci = XRGB5(imgData[x + (y * w)]);
 
+				// For some reason, some of the pixels get set to black. I'm not sure why.
 				if (ci != 0 && (chameleon->colors[ci].r + chameleon->colors[ci].g + chameleon->colors[ci].b) == 0)
 				{
 					wxMessageBox("oops");
@@ -150,9 +157,6 @@ void MainFrame::onFileOpen(wxCommandEvent &e)
 				img->SetRGB(x, y, chameleon->colors[ci].r * 255, chameleon->colors[ci].g * 255, chameleon->colors[ci].b * 255);
 			}
 		}
-
-		destroyChameleon(chameleon);
-		chameleon = nullptr;
 
 		delete[] imgData;
 
