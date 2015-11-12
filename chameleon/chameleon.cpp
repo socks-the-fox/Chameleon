@@ -135,7 +135,7 @@ void chameleonFindKeyColors(Chameleon *chameleon, const ChameleonParams *params,
 	ColorStat *stat = chameleon->colors;
 
 	// Convert colors to YUV for processing
-	for (uint16_t i = 0; i < MAX_COLOR_STATS; ++i)
+	for (uint16_t i = 0; i < LAST_COLOR; ++i)
 	{
 		fixRGB(&stat[i]);
 		calcYUV(&stat[i]);
@@ -155,12 +155,13 @@ void chameleonFindKeyColors(Chameleon *chameleon, const ChameleonParams *params,
 
 	float result = 1, temp = 0;
 
-	for (uint16_t i = 0; i < MAX_COLOR_STATS; ++i)
+	for (uint16_t i = 0; i < LAST_COLOR; ++i)
 	{
 		if (stat[i].count > 0)
 		{
 			temp = (stat[i].count * bg1Param->countWeight) + 1;
 			temp *= (stat[i].edgeCount * bg1Param->edgeWeight) + 1;
+			temp *= (saturation(&stat[i]) * bg1Param->saturationWeight) + 1;
 
 			if (temp > result)
 			{
@@ -172,7 +173,7 @@ void chameleonFindKeyColors(Chameleon *chameleon, const ChameleonParams *params,
 
 	// Now the foreground color...
 	result = 1;
-	for (uint16_t i = 0; i < MAX_COLOR_STATS; ++i)
+	for (uint16_t i = 0; i < LAST_COLOR; ++i)
 	{
 		if (i != bg1 && stat[i].count > 0)
 		{
@@ -192,7 +193,7 @@ void chameleonFindKeyColors(Chameleon *chameleon, const ChameleonParams *params,
 
 	// Second background...
 	result = 1;
-	for (uint16_t i = 0; i < MAX_COLOR_STATS; ++i)
+	for (uint16_t i = 0; i < LAST_COLOR; ++i)
 	{
 		if (i != bg1 && i != fg1 && stat[i].edgeCount > 0)
 		{
@@ -213,7 +214,7 @@ void chameleonFindKeyColors(Chameleon *chameleon, const ChameleonParams *params,
 
 	// Second foreground...
 	result = 1;
-	for (uint16_t i = 0; i < MAX_COLOR_STATS; ++i)
+	for (uint16_t i = 0; i < LAST_COLOR; ++i)
 	{
 		if (i != bg1 && i != fg1 && i != bg2 && stat[i].count > 0)
 		{

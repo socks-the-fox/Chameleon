@@ -1,5 +1,6 @@
 #define INVALID_INDEX UINT16_MAX
-#define MAX_COLOR_STATS 4096
+#define MAX_COLOR_STATS 74
+#define LAST_COLOR 0x3F
 #define MIN_CONTRAST 4.0f
 
 struct ColorStat
