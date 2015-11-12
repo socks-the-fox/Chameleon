@@ -377,8 +377,8 @@ const ChameleonParams defaultImageParams[4] =
 {
 	// BG1
 	{
-		1.0f, // countWeight
-		1.0f, // edgeWeight
+		0.5f, // countWeight
+		100.0f, // edgeWeight
 		0.0f, // bg1distanceWeight
 		0.0f, // fg1distanceWeight
 		0.0f, // saturationWeight
@@ -387,32 +387,32 @@ const ChameleonParams defaultImageParams[4] =
 
 	// FG1
 	{
-		0.04f,
+		0.188f,
+		-10.0f,
+		78.0f,
 		0.0f,
-		60.0f,
-		0.0f,
-		10.0f,
-		250.0f
+		190.0f,
+		10.0f
 	},
 
 	// BG2
 	{
-		0.5f,
-		0.0f,
-		0.0f,
+		0.75f,
 		10.0f,
+		-1000.0f,
+		1000.0f,
 		0.0f,
-		10.0f
+		160.0f
 	},
 
 	// FG2
 	{
-		0.015f,
-		0.0f,
-		60.0f,
-		0.5f,
-		200.0f,
-		0.0f
+		0.042f,
+		-1.0f,
+		24.0f,
+		100.0f,
+		146.0f,
+		8.0f
 	}
 };
 
