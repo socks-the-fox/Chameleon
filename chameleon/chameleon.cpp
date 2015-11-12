@@ -263,17 +263,6 @@ void chameleonFindKeyColors(Chameleon *chameleon, const ChameleonParams *params,
 
 	if (forceContrast)
 	{
-		// Set up a couple of key colors for the next step
-		if (stat[0x0000].count == 0)
-		{
-			stat[0x0000].r = stat[0x0000].g = stat[0x0000].b = 0.0f;
-		}
-
-		if (stat[0x0FFF].count == 0)
-		{
-			stat[0x0FFF].r = stat[0x0FFF].g = stat[0x0FFF].b = 1.0f;
-		}
-
 		// Find the contrast between the background and the foreground
 		float cont = contrast(&stat[fg1], &stat[bg1]);
 		// prevent infinite loops;
