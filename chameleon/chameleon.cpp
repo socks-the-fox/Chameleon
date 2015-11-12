@@ -137,8 +137,11 @@ void chameleonFindKeyColors(Chameleon *chameleon, const ChameleonParams *params,
 	// Convert colors to YUV for processing
 	for (uint16_t i = 0; i < LAST_COLOR; ++i)
 	{
-		fixRGB(&stat[i]);
-		calcYUV(&stat[i]);
+		if (stat[i].count)
+		{
+			fixRGB(&stat[i]);
+			calcYUV(&stat[i]);
+		}
 	}
 
 	// First, find the first background color.
