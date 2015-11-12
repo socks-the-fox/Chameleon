@@ -3,6 +3,7 @@
 #include <wx/wx.h>
 #include <wx/dcbuffer.h>
 #include <wx/wfstream.h>
+#include <wx/valnum.h>
 
 #include <chameleon.h>
 #include <chameleon_internal.h>
@@ -16,6 +17,16 @@ MainFrame::MainFrame() : wxFrame(nullptr, wxID_ANY, "Chameleon Test App")
 
 	wxMenuBar *menuBar = new wxMenuBar();
 	wxMenu *file = new wxMenu();
+
+	// Copy parameters to our temporary setup
+	const ChameleonParams *defParams = chameleonDefaultImageParams();
+
+	for (size_t i = 0; i < 4; ++i)
+	{
+		chamParams[i] = defParams[i];
+	}
+
+	editParams = chamParams[CHAMELEON_BACKGROUND1];
 
 	file->Append(wxID_OPEN, "&Open\tCtrl+O");
 	file->AppendSeparator();
@@ -58,6 +69,69 @@ MainFrame::MainFrame() : wxFrame(nullptr, wxID_ANY, "Chameleon Test App")
 	imgSizer->Add(colorSizer, wxSizerFlags(0).Expand().FixedMinSize());
 
 	mainSizer->Add(imgSizer, wxSizerFlags(1).Expand().FixedMinSize());
+
+	wxPanel *choicePanel = new wxPanel(this);
+	wxBoxSizer *choiceSizer = new wxBoxSizer(wxHORIZONTAL);
+
+	choiceSizer->Add(new wxStaticText(choicePanel, wxID_ANY, "Weights for"), wxSizerFlags(0).Border(wxALL, 4).Align(wxALIGN_LEFT | wxALIGN_CENTER_VERTICAL));
+
+	weightChoice = new wxChoice(choicePanel, wxID_ANY);
+	weightChoice->Insert("Background 1", CHAMELEON_BACKGROUND1);
+	weightChoice->Insert("Foreground 1", CHAMELEON_FOREGROUND1);
+	weightChoice->Insert("Background 2", CHAMELEON_BACKGROUND2);
+	weightChoice->Insert("Foreground 2", CHAMELEON_FOREGROUND2);
+	weightChoice->Select(CHAMELEON_BACKGROUND1);
+
+	weightChoice->Bind(wxEVT_CHOICE, &MainFrame::onWeightChoiceChanged, this);
+
+	choiceSizer->Add(weightChoice, wxSizerFlags(0).Border(wxALL, 4).Align(wxALIGN_LEFT | wxALIGN_CENTER_VERTICAL));
+
+	choiceSizer->AddStretchSpacer();
+
+	choicePanel->SetSizerAndFit(choiceSizer);
+	mainSizer->Add(choicePanel, wxSizerFlags(0).Expand().FixedMinSize());
+
+	wxPanel *editPanel = new wxPanel(this);
+	wxGridSizer *editSizer = new wxFlexGridSizer(2, 6, 0, 0);
+
+	wxFloatingPointValidator<float> countVal(3, &editParams.countWeight);
+	countWeight = new wxTextCtrl(editPanel, wxID_ANY, wxString::FromDouble(editParams.countWeight, 3), wxDefaultPosition, wxDefaultSize, 0, countVal);
+	countWeight->Bind(wxEVT_TEXT, &MainFrame::onWeightChanged, this);
+	editSizer->Add(new wxStaticText(editPanel, wxID_ANY, "Population:"), wxSizerFlags(0).Border(wxALL, 4).Align(wxALIGN_RIGHT | wxALIGN_CENTER_VERTICAL));
+	editSizer->Add(countWeight, wxSizerFlags(0).Border(wxALL, 4).Align(wxALIGN_LEFT | wxALIGN_CENTER_VERTICAL));
+
+	wxFloatingPointValidator<float> bg1Val(3, &editParams.bg1distanceWeight);
+	bg1DistanceWeight = new wxTextCtrl(editPanel, wxID_ANY, wxString::FromDouble(editParams.bg1distanceWeight, 3), wxDefaultPosition, wxDefaultSize, 0, bg1Val);
+	bg1DistanceWeight->Bind(wxEVT_TEXT, &MainFrame::onWeightChanged, this);
+	editSizer->Add(new wxStaticText(editPanel, wxID_ANY, "BG1 Dist:"), wxSizerFlags(0).Border(wxALL, 4).Align(wxALIGN_RIGHT | wxALIGN_CENTER_VERTICAL));
+	editSizer->Add(bg1DistanceWeight, wxSizerFlags(0).Border(wxALL, 4).Align(wxALIGN_LEFT | wxALIGN_CENTER_VERTICAL));
+
+	wxFloatingPointValidator<float> satVal(3, &editParams.saturationWeight);
+	saturationWeight = new wxTextCtrl(editPanel, wxID_ANY, wxString::FromDouble(editParams.saturationWeight, 3), wxDefaultPosition, wxDefaultSize, 0, satVal);
+	saturationWeight->Bind(wxEVT_TEXT, &MainFrame::onWeightChanged, this);
+	editSizer->Add(new wxStaticText(editPanel, wxID_ANY, "Saturation:"), wxSizerFlags(0).Border(wxALL, 4).Align(wxALIGN_RIGHT | wxALIGN_CENTER_VERTICAL));
+	editSizer->Add(saturationWeight, wxSizerFlags(0).Border(wxALL, 4).Align(wxALIGN_LEFT | wxALIGN_CENTER_VERTICAL));
+
+	wxFloatingPointValidator<float> edgeVal(3, &editParams.edgeWeight);
+	edgeWeight = new wxTextCtrl(editPanel, wxID_ANY, wxString::FromDouble(editParams.edgeWeight, 3), wxDefaultPosition, wxDefaultSize, 0, edgeVal);
+	edgeWeight->Bind(wxEVT_TEXT, &MainFrame::onWeightChanged, this);
+	editSizer->Add(new wxStaticText(editPanel, wxID_ANY, "Edge Pop:"), wxSizerFlags(0).Border(wxALL, 4).Align(wxALIGN_RIGHT | wxALIGN_CENTER_VERTICAL));
+	editSizer->Add(edgeWeight, wxSizerFlags(0).Border(wxALL, 4).Align(wxALIGN_LEFT | wxALIGN_CENTER_VERTICAL));
+
+	wxFloatingPointValidator<float> fg1Val(3, &editParams.fg1distanceWeight);
+	fg1DistanceWeight = new wxTextCtrl(editPanel, wxID_ANY, wxString::FromDouble(editParams.fg1distanceWeight, 3), wxDefaultPosition, wxDefaultSize, 0, fg1Val);
+	fg1DistanceWeight->Bind(wxEVT_TEXT, &MainFrame::onWeightChanged, this);
+	editSizer->Add(new wxStaticText(editPanel, wxID_ANY, "FG1 Dist:"), wxSizerFlags(0).Border(wxALL, 4).Align(wxALIGN_RIGHT | wxALIGN_CENTER_VERTICAL));
+	editSizer->Add(fg1DistanceWeight, wxSizerFlags(0).Border(wxALL, 4).Align(wxALIGN_LEFT | wxALIGN_CENTER_VERTICAL));
+
+	wxFloatingPointValidator<float> contVal(3, &editParams.fg1distanceWeight);
+	contrastWeight = new wxTextCtrl(editPanel, wxID_ANY, wxString::FromDouble(editParams.contrastWeight, 3), wxDefaultPosition, wxDefaultSize, 0, contVal);
+	contrastWeight->Bind(wxEVT_TEXT, &MainFrame::onWeightChanged, this);
+	editSizer->Add(new wxStaticText(editPanel, wxID_ANY, "Contrast:"), wxSizerFlags(0).Border(wxALL, 4).Align(wxALIGN_RIGHT | wxALIGN_CENTER_VERTICAL));
+	editSizer->Add(contrastWeight, wxSizerFlags(0).Border(wxALL, 4).Align(wxALIGN_LEFT | wxALIGN_CENTER_VERTICAL));
+
+	editPanel->SetSizerAndFit(editSizer);
+	mainSizer->Add(editPanel, wxSizerFlags(0).Expand().FixedMinSize());
 
 	output = new wxTextCtrl(this, wxID_ANY, wxEmptyString, wxDefaultPosition, wxSize(512, 128), wxTE_MULTILINE | wxTE_READONLY);
 	mainSizer->Add(output, wxSizerFlags(0).Expand().FixedMinSize());
@@ -131,12 +205,7 @@ void MainFrame::onFileOpen(wxCommandEvent &e)
 
 		chameleonProcessImage(chameleon, imgData, w, h);
 
-		chameleonFindKeyColors(chameleon, chameleonDefaultImageParams());
-
-		cp1->SetBackgroundColour(wxColor(chameleonGetColor(chameleon, CHAMELEON_BACKGROUND1)));
-		cp2->SetBackgroundColour(wxColor(chameleonGetColor(chameleon, CHAMELEON_BACKGROUND2)));
-		cp3->SetBackgroundColour(wxColor(chameleonGetColor(chameleon, CHAMELEON_FOREGROUND1)));
-		cp4->SetBackgroundColour(wxColor(chameleonGetColor(chameleon, CHAMELEON_FOREGROUND2)));
+		updateChameleon();
 
 		wxMilliClock_t end = wxGetLocalTimeMillis();
 
@@ -148,15 +217,8 @@ void MainFrame::onFileOpen(wxCommandEvent &e)
 			{
 				uint16_t ci = XRGB5(imgData[x + (y * w)]);
 
-				// For some reason, some of the pixels get set to black. I'm not sure why.
-				if (ci != 0 && (chameleon->colors[ci].r + chameleon->colors[ci].g + chameleon->colors[ci].b) == 0)
-				{
-					wxMessageBox("oops");
-				}
-				else if (chameleon->colors[ci].r > 1 || chameleon->colors[ci].g > 1 || chameleon->colors[ci].b > 1)
-				{
-					wxMessageBox("oops 2");
-				}
+				// Some pixels get set to black. These pixels are skipped during the downsampling process
+				// (it's a very simplistic process) and so Chameleon never sees them.
 
 				img->SetRGB(x, y, chameleon->colors[ci].r * 255, chameleon->colors[ci].g * 255, chameleon->colors[ci].b * 255);
 			}
@@ -208,4 +270,84 @@ void MainFrame::onResize(wxSizeEvent &e)
 {
 	imgPanel->Refresh();
 	imgPanel->Update();
+}
+
+void MainFrame::onWeightChoiceChanged(wxCommandEvent &e)
+{
+	size_t i = weightChoice->GetSelection();
+
+	editParams = chamParams[i];
+
+	countWeight->ChangeValue(wxString::FromDouble(editParams.countWeight, 3));
+	edgeWeight->ChangeValue(wxString::FromDouble(editParams.edgeWeight, 3));
+	bg1DistanceWeight->ChangeValue(wxString::FromDouble(editParams.bg1distanceWeight, 3));
+	fg1DistanceWeight->ChangeValue(wxString::FromDouble(editParams.fg1distanceWeight, 3));
+	saturationWeight->ChangeValue(wxString::FromDouble(editParams.saturationWeight, 3));
+	contrastWeight->ChangeValue(wxString::FromDouble(editParams.contrastWeight, 3));
+}
+
+void MainFrame::onWeightChanged(wxCommandEvent &e)
+{
+	size_t i = weightChoice->GetSelection();
+	double tmp;
+
+	if (!countWeight->GetValue().ToDouble(&tmp))
+	{
+		tmp = 0;
+	}
+	editParams.countWeight = tmp;
+
+	if(!edgeWeight->GetValue().ToDouble(&tmp))
+	{
+		tmp = 0;
+	}
+	editParams.edgeWeight = tmp;
+
+	if(!bg1DistanceWeight->GetValue().ToDouble(&tmp))
+	{
+		tmp = 0;
+	}
+	editParams.bg1distanceWeight = tmp;
+
+	if (!fg1DistanceWeight->GetValue().ToDouble(&tmp))
+	{
+		tmp = 0;
+	}
+	editParams.fg1distanceWeight = tmp;
+
+	if (!saturationWeight->GetValue().ToDouble(&tmp))
+	{
+		tmp = 0;
+	}
+	editParams.saturationWeight = tmp;
+
+	if (!contrastWeight->GetValue().ToDouble(&tmp))
+	{
+		tmp = 0;
+	}
+	editParams.contrastWeight = tmp;
+
+	chamParams[i] = editParams;
+
+	updateChameleon();
+}
+
+void MainFrame::updateChameleon()
+{
+	// Don't refresh Chameleon's colors if it doesn't exist yet...
+	if (chameleon == nullptr)
+	{
+		return;
+	}
+
+	chameleonFindKeyColors(chameleon, chamParams);
+
+	cp1->SetBackgroundColour(wxColor(chameleonGetColor(chameleon, CHAMELEON_BACKGROUND1)));
+	cp1->Refresh();
+	cp2->SetBackgroundColour(wxColor(chameleonGetColor(chameleon, CHAMELEON_BACKGROUND2)));
+	cp2->Refresh();
+	cp3->SetBackgroundColour(wxColor(chameleonGetColor(chameleon, CHAMELEON_FOREGROUND1)));
+	cp3->Refresh();
+	cp4->SetBackgroundColour(wxColor(chameleonGetColor(chameleon, CHAMELEON_FOREGROUND2)));
+	cp4->Refresh();
 }
