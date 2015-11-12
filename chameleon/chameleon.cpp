@@ -159,9 +159,9 @@ void chameleonFindKeyColors(Chameleon *chameleon, const ChameleonParams *params,
 	{
 		if (stat[i].count > 0)
 		{
-			temp = (stat[i].count * bg1Param->countWeight) + 1;
-			temp *= (stat[i].edgeCount * bg1Param->edgeWeight) + 1;
-			temp *= (saturation(&stat[i]) * bg1Param->saturationWeight) + 1;
+			temp = stat[i].count * bg1Param->countWeight;
+			temp += stat[i].edgeCount * bg1Param->edgeWeight;
+			temp += saturation(&stat[i]) * bg1Param->saturationWeight;
 
 			if (temp > result)
 			{
@@ -177,11 +177,11 @@ void chameleonFindKeyColors(Chameleon *chameleon, const ChameleonParams *params,
 	{
 		if (i != bg1 && stat[i].count > 0)
 		{
-			temp = (stat[i].count * fg1Param->countWeight) + 1;
-			temp *= (stat[i].edgeCount * fg1Param->edgeWeight) + 1;
-			temp *= (distance(&stat[i], &stat[bg1]) * fg1Param->bg1distanceWeight) + 1;
-			temp *= (saturation(&stat[i]) * fg1Param->saturationWeight) + 1;
-			temp *= (contrast(&stat[i], &stat[bg1]) * fg1Param->contrastWeight) + 1;
+			temp = stat[i].count * fg1Param->countWeight;
+			temp += stat[i].edgeCount * fg1Param->edgeWeight;
+			temp += distance(&stat[i], &stat[bg1]) * fg1Param->bg1distanceWeight;
+			temp += saturation(&stat[i]) * fg1Param->saturationWeight;
+			temp += contrast(&stat[i], &stat[bg1]) * fg1Param->contrastWeight;
 
 			if (temp >= result)
 			{
@@ -197,12 +197,12 @@ void chameleonFindKeyColors(Chameleon *chameleon, const ChameleonParams *params,
 	{
 		if (i != bg1 && i != fg1 && stat[i].edgeCount > 0)
 		{
-			temp = (stat[i].count * bg2Param->countWeight) + 1;
-			temp *= (stat[i].edgeCount * bg2Param->edgeWeight) + 1;
-			temp *= (distance(&stat[i], &stat[bg1]) * bg2Param->bg1distanceWeight) + 1;
-			temp *= (distance(&stat[i], &stat[fg1]) * bg2Param->fg1distanceWeight) + 1;
-			temp *= (saturation(&stat[i]) * bg2Param->saturationWeight) + 1;
-			temp *= (contrast(&stat[i], &stat[fg1]) * bg2Param->contrastWeight) + 1;
+			temp = stat[i].count * bg2Param->countWeight;
+			temp += stat[i].edgeCount * bg2Param->edgeWeight;
+			temp += distance(&stat[i], &stat[bg1]) * bg2Param->bg1distanceWeight;
+			temp += distance(&stat[i], &stat[fg1]) * bg2Param->fg1distanceWeight;
+			temp += saturation(&stat[i]) * bg2Param->saturationWeight;
+			temp += contrast(&stat[i], &stat[fg1]) * bg2Param->contrastWeight;
 
 			if (temp >= result)
 			{
@@ -218,12 +218,12 @@ void chameleonFindKeyColors(Chameleon *chameleon, const ChameleonParams *params,
 	{
 		if (i != bg1 && i != fg1 && i != bg2 && stat[i].count > 0)
 		{
-			temp = (stat[i].count * fg2Param->countWeight) + 1;
-			temp *= (stat[i].edgeCount * fg2Param->edgeWeight) + 1;
-			temp *= (distance(&stat[i], &stat[bg1]) * fg2Param->bg1distanceWeight) + 1;
-			temp *= (distance(&stat[i], &stat[fg1]) * fg2Param->fg1distanceWeight) + 1;
-			temp *= (saturation(&stat[i]) * fg2Param->saturationWeight) + 1;
-			temp *= (contrast(&stat[i], &stat[bg1]) * fg2Param->contrastWeight) + 1;
+			temp = stat[i].count * fg2Param->countWeight;
+			temp += stat[i].edgeCount * fg2Param->edgeWeight;
+			temp += distance(&stat[i], &stat[bg1]) * fg2Param->bg1distanceWeight;
+			temp += distance(&stat[i], &stat[fg1]) * fg2Param->fg1distanceWeight;
+			temp += saturation(&stat[i]) * fg2Param->saturationWeight;
+			temp += contrast(&stat[i], &stat[bg1]) * fg2Param->contrastWeight;
 
 			if (temp >= result)
 			{
