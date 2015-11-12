@@ -46,6 +46,8 @@ struct Chameleon
 
 	// Set of color data
 	ColorStat *colors;
+
+	bool rgbFixed;
 };
 
 inline uint16_t XRGB5(uint32_t c)

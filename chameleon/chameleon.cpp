@@ -16,6 +16,8 @@ Chameleon* createChameleon()
 	
 	memset(result->colors, 0, MAX_COLOR_STATS * sizeof(ColorStat));
 
+	result->rgbFixed = false;
+
 	return result;
 }
 
@@ -127,6 +129,8 @@ void chameleonProcessImage(Chameleon *chameleon, const uint32_t *imgData, size_t
 		chameleonProcessLine(chameleon, &imgData[imgWidth * i], imgWidth, (i == 0 || i == (imgHeight - 1)));
 	}
 
+	chameleon->rgbFixed = false;
+
 	delete[] resampledData;
 }
 
@@ -135,13 +139,18 @@ void chameleonFindKeyColors(Chameleon *chameleon, const ChameleonParams *params,
 	ColorStat *stat = chameleon->colors;
 
 	// Convert colors to YUV for processing
-	for (uint16_t i = 0; i < LAST_COLOR; ++i)
+	if (!chameleon->rgbFixed)
 	{
-		if (stat[i].count)
+		for (uint16_t i = 0; i < LAST_COLOR; ++i)
 		{
-			fixRGB(&stat[i]);
-			calcYUV(&stat[i]);
+			if (stat[i].count)
+			{
+				fixRGB(&stat[i]);
+				calcYUV(&stat[i]);
+			}
 		}
+
+		chameleon->rgbFixed = true;
 	}
 
 	// First, find the first background color.
