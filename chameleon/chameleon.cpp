@@ -10,7 +10,10 @@ extern const ChameleonParams defaultIconParams[4];
 Chameleon* createChameleon()
 {
 	Chameleon *result = new Chameleon;
-	result->background1 = result->background2 = result->foreground1 = result->foreground2 = INVALID_INDEX;
+	for (size_t i = 0; i < CHAMELEON_COLORS; ++i)
+	{
+		result->colorIndex[i] = INVALID_INDEX;
+	}
 
 	result->colors = static_cast<ColorStat*>(_aligned_malloc(MAX_COLOR_STATS * sizeof(ColorStat), 16));
 	
@@ -269,8 +272,8 @@ void chameleonFindKeyColors(Chameleon *chameleon, const ChameleonParams *params,
 		size_t loops;
 		if (cont < MIN_CONTRAST)
 		{
-			stat[64] = stat[fg1];
-			fg1 = 64;
+			stat[FG1_BACKUP_INDEX] = stat[fg1];
+			fg1 = FG1_BACKUP_INDEX;
 			loops = 0;
 			while (cont < MIN_CONTRAST && loops < 8)
 			{
@@ -291,8 +294,8 @@ void chameleonFindKeyColors(Chameleon *chameleon, const ChameleonParams *params,
 		cont = contrast(&stat[fg2], &stat[bg1]);
 		if (cont < MIN_CONTRAST)
 		{
-			stat[65] = stat[fg2];
-			fg2 = 65;
+			stat[FG2_BACKUP_INDEX] = stat[fg2];
+			fg2 = FG2_BACKUP_INDEX;
 			loops = 0;
 			while (cont < MIN_CONTRAST && loops < 8)
 			{
@@ -311,41 +314,23 @@ void chameleonFindKeyColors(Chameleon *chameleon, const ChameleonParams *params,
 		}
 	}
 
-	chameleon->background1 = bg1;
-	chameleon->background2 = bg2;
-	chameleon->foreground1 = fg1;
-	chameleon->foreground2 = fg2;
+	// TODO: Sort picked colors by brightness to fill LIGHTx and DARKx
+
+	chameleon->colorIndex[CHAMELEON_BACKGROUND1] = bg1;
+	chameleon->colorIndex[CHAMELEON_BACKGROUND2] = bg2;
+	chameleon->colorIndex[CHAMELEON_FOREGROUND1] = fg1;
+	chameleon->colorIndex[CHAMELEON_FOREGROUND2] = fg2;
 }
 
 uint32_t chameleonGetColor(Chameleon *chameleon, ChameleonColor color)
 {
 	uint32_t result;
 
-	float r, g, b;
+	uint16_t i = chameleon->colorIndex[color];
 
-	switch (color)
-	{
-	case CHAMELEON_BACKGROUND1:
-		r = chameleon->colors[chameleon->background1].r;
-		g = chameleon->colors[chameleon->background1].g;
-		b = chameleon->colors[chameleon->background1].b;
-		break;
-	case CHAMELEON_FOREGROUND1:
-		r = chameleon->colors[chameleon->foreground1].r;
-		g = chameleon->colors[chameleon->foreground1].g;
-		b = chameleon->colors[chameleon->foreground1].b;
-		break;
-	case CHAMELEON_BACKGROUND2:
-		r = chameleon->colors[chameleon->background2].r;
-		g = chameleon->colors[chameleon->background2].g;
-		b = chameleon->colors[chameleon->background2].b;
-		break;
-	case CHAMELEON_FOREGROUND2:
-		r = chameleon->colors[chameleon->foreground2].r;
-		g = chameleon->colors[chameleon->foreground2].g;
-		b = chameleon->colors[chameleon->foreground2].b;
-		break;
-	}
+	float r = chameleon->colors[i].r;
+	float g = chameleon->colors[i].g;
+	float b = chameleon->colors[i].b;
 
 	result = int(r * 255) | (int(g * 255) << 8) | (int(b * 255) << 16) | 0xFF000000;
 
