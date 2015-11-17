@@ -38,6 +38,8 @@ void chameleonProcessLine(Chameleon *chameleon, const uint32_t *lineData, size_t
 
 	float edge = (edgeLine ? 1.0f : 0.0f);
 
+	__m128 rgbc;
+
 	for (size_t i = 0; i < lineWidth; ++i)
 	{
 		// Ignore pixels that are mostly transparent
@@ -46,13 +48,10 @@ void chameleonProcessLine(Chameleon *chameleon, const uint32_t *lineData, size_t
 
 		cIndex = XRGB5(lineData[i]);
 
+		rgbc = _mm_set_ps(1.0f, ((lineData[i] & 0x00FF0000) >> 16) / 255.0f, ((lineData[i] & 0x0000FF00) >> 8) / 255.0f, ((lineData[i] & 0x000000FF)) / 255.0f);
 
-		// TODO: SIMDize this?
-		stat[cIndex].r += ((lineData[i] & 0x000000FF)      ) / 255.0f;
-		stat[cIndex].g += ((lineData[i] & 0x0000FF00) >>  8) / 255.0f;
-		stat[cIndex].b += ((lineData[i] & 0x00FF0000) >> 16) / 255.0f;
-
-		stat[cIndex].count += 1.0f;
+		stat[cIndex].rgbc = _mm_add_ps(rgbc, stat[cIndex].rgbc);
+		stat[AVG_INDEX].rgbc = _mm_add_ps(rgbc, stat[AVG_INDEX].rgbc);
 
 		stat[cIndex].edgeCount += edge;
 	}
@@ -152,6 +151,9 @@ void chameleonFindKeyColors(Chameleon *chameleon, const ChameleonParams *params,
 				calcYUV(&stat[i]);
 			}
 		}
+
+		fixRGB(&stat[AVG_INDEX]);
+		calcYUV(&stat[AVG_INDEX]);
 
 		chameleon->rgbFixed = true;
 	}
