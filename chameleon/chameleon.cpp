@@ -316,7 +316,30 @@ void chameleonFindKeyColors(Chameleon *chameleon, const ChameleonParams *params,
 		}
 	}
 
-	// TODO: Sort picked colors by brightness to fill LIGHTx and DARKx
+	// Sort picked colors by brightness to fill LIGHTx and DARKx
+
+	chameleon->colorIndex[CHAMELEON_LIGHT1] = bg1;
+	chameleon->colorIndex[CHAMELEON_LIGHT2] = bg2;
+	chameleon->colorIndex[CHAMELEON_LIGHT3] = fg1;
+	chameleon->colorIndex[CHAMELEON_LIGHT4] = fg2;
+
+	for (size_t j = 0; j < 4; ++j)
+	{
+		for (size_t i = 0; i < (3 - j); ++i)
+		{
+			if (stat[chameleon->colorIndex[CHAMELEON_LIGHT1 + i]].y < stat[chameleon->colorIndex[CHAMELEON_LIGHT1 + i + 1]].y)
+			{
+				uint16_t color = chameleon->colorIndex[CHAMELEON_LIGHT1 + i];
+				chameleon->colorIndex[CHAMELEON_LIGHT1 + i] = chameleon->colorIndex[CHAMELEON_LIGHT1 + i + 1];
+				chameleon->colorIndex[CHAMELEON_LIGHT1 + i + 1] = color;
+			}
+		}
+	}
+
+	chameleon->colorIndex[CHAMELEON_DARK1] = chameleon->colorIndex[CHAMELEON_LIGHT4];
+	chameleon->colorIndex[CHAMELEON_DARK2] = chameleon->colorIndex[CHAMELEON_LIGHT3];
+	chameleon->colorIndex[CHAMELEON_DARK3] = chameleon->colorIndex[CHAMELEON_LIGHT2];
+	chameleon->colorIndex[CHAMELEON_DARK4] = chameleon->colorIndex[CHAMELEON_LIGHT1];
 
 	chameleon->colorIndex[CHAMELEON_BACKGROUND1] = bg1;
 	chameleon->colorIndex[CHAMELEON_BACKGROUND2] = bg2;
