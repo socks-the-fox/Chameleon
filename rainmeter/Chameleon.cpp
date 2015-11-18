@@ -110,20 +110,11 @@ _COM_SMARTPTR_TYPEDEF(IImageList, __uuidof(IImageList));
 // so I can dump libPNG. Not that I have anything against it, but
 // it's a bit hefty to use for literally only the one specific
 // subtype of PNG...
-uint32_t* loadPNG16(const char *path, int *w, int *h)
+uint32_t* loadPNG16(FILE *fp, int *w, int *h)
 {
 	uint32_t *imgData = nullptr;
-	FILE *fp = nullptr;
 	*w = -1;
 	*h = -1;
-
-	if (fopen_s(&fp, path, "rb") != 0)
-	{
-		// Try again next update
-		*w = 0;
-		*h = 0;
-		return imgData;
-	}
 
 	// Normally we would think "it has to be a PNG or we wouldn't be here"
 	// But since we close the file (in the stbi library) and then re-open
@@ -212,12 +203,11 @@ uint32_t* loadPNG16(const char *path, int *w, int *h)
 	// Cleanup!
 	png_destroy_read_struct(&png_ptr, &info_ptr, nullptr);
 	delete[] rows;
-	fclose(fp);
 
 	return imgData;
 }
 
-uint32_t* loadIcon(const char *path, int *w, int *h)
+uint32_t* loadIcon(const wchar_t *path, int *w, int *h)
 {
 	// Outputs
 	uint32_t *imgData = nullptr;
@@ -231,7 +221,7 @@ uint32_t* loadIcon(const char *path, int *w, int *h)
 	BITMAPINFO bmi;
 	BITMAP bm;
 	HDC hDC = GetDC(NULL);
-	SHFILEINFO info = { 0 };
+	SHFILEINFOW info = { 0 };
 	int iconSize = SHIL_EXTRALARGE;
 	if (IsWindowsVistaOrGreater())
 	{
@@ -242,7 +232,7 @@ uint32_t* loadIcon(const char *path, int *w, int *h)
 	// I'll fix them if they ever report breakage
 	// I was dreading this part until I found out it's
 	// literally three functions.
-	SHGetFileInfo(path, 0, &info, sizeof(info), SHGFI_SYSICONINDEX);
+	SHGetFileInfoW(path, 0, &info, sizeof(info), SHGFI_SYSICONINDEX);
 	SHGetImageList(iconSize, IID_PPV_ARGS(&spiml));
 	spiml->GetIcon(info.iIcon, ILD_TRANSPARENT, &hIcon);
 
@@ -444,32 +434,31 @@ void SampleImage(std::shared_ptr<Image> img)
 		RmLog(LOG_DEBUG, debug.c_str());
 
 		// Convert the path
-		size_t toss;
-		char *path = new char[MAX_PATH];
+
+		FILE *fp;
 		
-		wcstombs_s(&toss, path, MAX_PATH, img->path.c_str(), MAX_PATH);
+		if (_wfopen_s(&fp, img->path.c_str(), L"rb") != 0)
+		{
+			// Something goofed, but we can try again
+			if (r == S_OK || r == S_FALSE)
+			{
+				CoUninitialize();
+			}
+			return;
+		}
 
 		// Load image data
 		int w, h, n;
-		uint32_t *imgData = (uint32_t*) stbi_load(path, &w, &h, &n, 4);
+		uint32_t *imgData = (uint32_t*) stbi_load_from_file(fp, &w, &h, &n, 4);
 
 		if (imgData == nullptr)
 		{
 			RmLog(LOG_ERROR, L"Could not load desktop!");
 			const char *debug = stbi_failure_reason();
-			if (strcmp(debug, "can't fopen") == 0)
-			{
-				// Try again next update
-				if (r == S_OK || r == S_FALSE)
-				{
-					CoUninitialize();
-				}
-				return;
-			}
-			else if (strcmp(debug, "1/2/4/8-bit only") == 0)
+			if (strcmp(debug, "1/2/4/8-bit only") == 0)
 			{
 				// It's a 16-bit PNG, time to do this manually
-				imgData = loadPNG16(path, &w, &h);
+				imgData = loadPNG16(fp, &w, &h);
 
 				if (imgData == nullptr && w == -1)
 				{
@@ -483,21 +472,13 @@ void SampleImage(std::shared_ptr<Image> img)
 					{
 						CoUninitialize();
 					}
-					return;
-				}
-				else if (imgData == nullptr && w == 0)
-				{
-					// Something goofed, but we can try again
-					if (r == S_OK || r == S_FALSE)
-					{
-						CoUninitialize();
-					}
+					fclose(fp);
 					return;
 				}
 			}
 			else
 			{
-				imgData = loadIcon(path, &w, &h);
+				imgData = loadIcon(img->path.c_str(), &w, &h);
 
 				if (imgData == nullptr)
 				{
@@ -511,6 +492,7 @@ void SampleImage(std::shared_ptr<Image> img)
 					{
 						CoUninitialize();
 					}
+					fclose(fp);
 					return;
 				}
 
@@ -525,6 +507,8 @@ void SampleImage(std::shared_ptr<Image> img)
 				isIcon = true;
 			}
 		}
+
+		fclose(fp);
 
 		isIcon |= img->forceIcon;
 
