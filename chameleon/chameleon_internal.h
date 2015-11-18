@@ -1,6 +1,11 @@
 #define INVALID_INDEX UINT16_MAX
-#define MAX_COLOR_STATS 4096
+#define MAX_COLOR_STATS 67
+#define LAST_COLOR 0x3F
 #define MIN_CONTRAST 4.0f
+
+#define FG1_BACKUP_INDEX 64
+#define FG2_BACKUP_INDEX 65
+#define AVG_INDEX 66
 
 struct ColorStat
 {
@@ -31,29 +36,23 @@ struct ColorStat
 
 struct Chameleon
 {
-	// Index of first BG color
-	uint16_t background1;
-
-	// Index of second BG color
-	uint16_t background2;
-
-	// Index of first FG color
-	uint16_t foreground1;
-
-	// Index of second FG color
-	uint16_t foreground2;
+	// List of colors Chameleon has picked for the image
+	uint16_t colorIndex[CHAMELEON_COLORS];
 
 	// Set of color data
 	ColorStat *colors;
+
+	// Whether or not we've already fixed the RGB values so we don't screw them up
+	bool rgbFixed;
 };
 
 inline uint16_t XRGB5(uint32_t c)
 {
-	uint8_t b = (c >> 20) & 0x0F;
-	uint8_t g = (c >> 12) & 0x0F;
-	uint8_t r = (c >>  4) & 0x0F;
+	uint8_t b = (c >> 22) & 0x03;
+	uint8_t g = (c >> 14) & 0x03;
+	uint8_t r = (c >>  6) & 0x03;
 
-	return (r << 8) | (g << 4) | b;
+	return (r << 4) | (g << 2) | b;
 }
 
 void fixRGB(ColorStat *color);

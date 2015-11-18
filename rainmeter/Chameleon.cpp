@@ -27,7 +27,17 @@ enum MeasureType
 	MEASURE_BG1,
 	MEASURE_BG2,
 	MEASURE_FG1,
-	MEASURE_FG2
+	MEASURE_FG2,
+	MEASURE_AVG_LUM,
+	MEASURE_AVG_COLOR,
+	MEASURE_L1,
+	MEASURE_L2,
+	MEASURE_L3,
+	MEASURE_L4,
+	MEASURE_D1,
+	MEASURE_D2,
+	MEASURE_D3,
+	MEASURE_D4
 };
 
 enum ImageType
@@ -53,10 +63,23 @@ struct Image
 	uint32_t fg1;
 	uint32_t fg2;
 
+	uint32_t l1;
+	uint32_t l2;
+	uint32_t l3;
+	uint32_t l4;
+
+	uint32_t d1;
+	uint32_t d2;
+	uint32_t d3;
+	uint32_t d4;
+
 	uint32_t fallback_bg1;
 	uint32_t fallback_bg2;
 	uint32_t fallback_fg1;
 	uint32_t fallback_fg2;
+
+	float lum;
+	uint32_t avg;
 };
 
 struct Measure
@@ -110,20 +133,11 @@ _COM_SMARTPTR_TYPEDEF(IImageList, __uuidof(IImageList));
 // so I can dump libPNG. Not that I have anything against it, but
 // it's a bit hefty to use for literally only the one specific
 // subtype of PNG...
-uint32_t* loadPNG16(const char *path, int *w, int *h)
+uint32_t* loadPNG16(FILE *fp, int *w, int *h)
 {
 	uint32_t *imgData = nullptr;
-	FILE *fp = nullptr;
 	*w = -1;
 	*h = -1;
-
-	if (fopen_s(&fp, path, "rb") != 0)
-	{
-		// Try again next update
-		*w = 0;
-		*h = 0;
-		return imgData;
-	}
 
 	// Normally we would think "it has to be a PNG or we wouldn't be here"
 	// But since we close the file (in the stbi library) and then re-open
@@ -212,12 +226,11 @@ uint32_t* loadPNG16(const char *path, int *w, int *h)
 	// Cleanup!
 	png_destroy_read_struct(&png_ptr, &info_ptr, nullptr);
 	delete[] rows;
-	fclose(fp);
 
 	return imgData;
 }
 
-uint32_t* loadIcon(const char *path, int *w, int *h)
+uint32_t* loadIcon(const wchar_t *path, int *w, int *h)
 {
 	// Outputs
 	uint32_t *imgData = nullptr;
@@ -231,7 +244,7 @@ uint32_t* loadIcon(const char *path, int *w, int *h)
 	BITMAPINFO bmi;
 	BITMAP bm;
 	HDC hDC = GetDC(NULL);
-	SHFILEINFO info = { 0 };
+	SHFILEINFOW info = { 0 };
 	int iconSize = SHIL_EXTRALARGE;
 	if (IsWindowsVistaOrGreater())
 	{
@@ -242,7 +255,7 @@ uint32_t* loadIcon(const char *path, int *w, int *h)
 	// I'll fix them if they ever report breakage
 	// I was dreading this part until I found out it's
 	// literally three functions.
-	SHGetFileInfo(path, 0, &info, sizeof(info), SHGFI_SYSICONINDEX);
+	SHGetFileInfoW(path, 0, &info, sizeof(info), SHGFI_SYSICONINDEX);
 	SHGetImageList(iconSize, IID_PPV_ARGS(&spiml));
 	spiml->GetIcon(info.iIcon, ILD_TRANSPARENT, &hIcon);
 
@@ -400,6 +413,15 @@ void SampleImage(std::shared_ptr<Image> img)
 			img->fg1 = _byteswap_ulong(GetSysColor(COLOR_CAPTIONTEXT)) | 0xFF;
 			img->fg2 = _byteswap_ulong(GetSysColor(COLOR_INACTIVECAPTIONTEXT)) | 0xFF;
 
+			// TODO: Actually find the brightness of these to sort it properly:
+			img->l1 = img->d4 = img->bg1;
+			img->l2 = img->d3 = img->bg2;
+			img->l3 = img->d2 = img->fg1;
+			img->l4 = img->d1 = img->fg2;
+
+			img->lum = 1.0f;
+			img->avg = 0xFFFFFFFF;
+
 			img->dirty = false;
 		}
 	}
@@ -413,6 +435,16 @@ void SampleImage(std::shared_ptr<Image> img)
 			img->bg2 = img->fallback_bg2;
 			img->fg1 = img->fallback_fg1;
 			img->fg2 = img->fallback_fg2;
+
+			// TODO: Actually find the brightness of these to sort it properly:
+			img->l1 = img->d4 = img->bg1;
+			img->l2 = img->d3 = img->bg2;
+			img->l3 = img->d2 = img->fg1;
+			img->l4 = img->d1 = img->fg2;
+
+			img->lum = 1.0f;
+			img->avg = 0xFFFFFFFF;
+
 			img->dirty = false;
 
 			if (r == S_OK || r == S_FALSE)
@@ -444,32 +476,32 @@ void SampleImage(std::shared_ptr<Image> img)
 		RmLog(LOG_DEBUG, debug.c_str());
 
 		// Convert the path
-		size_t toss;
-		char *path = new char[MAX_PATH];
+
+		FILE *fp;
 		
-		wcstombs_s(&toss, path, MAX_PATH, img->path.c_str(), MAX_PATH);
+		if (_wfopen_s(&fp, img->path.c_str(), L"rb") != 0)
+		{
+			// Something goofed, but we can try again
+			if (r == S_OK || r == S_FALSE)
+			{
+				CoUninitialize();
+			}
+			return;
+		}
 
 		// Load image data
 		int w, h, n;
-		uint32_t *imgData = (uint32_t*) stbi_load(path, &w, &h, &n, 4);
+		uint32_t *imgData = (uint32_t*) stbi_load_from_file(fp, &w, &h, &n, 4);
 
 		if (imgData == nullptr)
 		{
 			RmLog(LOG_ERROR, L"Could not load desktop!");
+			fseek(fp, 0, SEEK_SET);
 			const char *debug = stbi_failure_reason();
-			if (strcmp(debug, "can't fopen") == 0)
-			{
-				// Try again next update
-				if (r == S_OK || r == S_FALSE)
-				{
-					CoUninitialize();
-				}
-				return;
-			}
-			else if (strcmp(debug, "1/2/4/8-bit only") == 0)
+			if (strcmp(debug, "1/2/4/8-bit only") == 0)
 			{
 				// It's a 16-bit PNG, time to do this manually
-				imgData = loadPNG16(path, &w, &h);
+				imgData = loadPNG16(fp, &w, &h);
 
 				if (imgData == nullptr && w == -1)
 				{
@@ -478,26 +510,27 @@ void SampleImage(std::shared_ptr<Image> img)
 					img->bg2 = img->fallback_bg2;
 					img->fg1 = img->fallback_fg1;
 					img->fg2 = img->fallback_fg2;
+
+					img->l1 = img->d4 = img->bg1;
+					img->l2 = img->d3 = img->bg2;
+					img->l3 = img->d2 = img->fg1;
+					img->l4 = img->d1 = img->fg2;
+
+					img->lum = 1.0f;
+					img->avg = 0xFFFFFFFF;
+
 					img->dirty = false;
 					if (r == S_OK || r == S_FALSE)
 					{
 						CoUninitialize();
 					}
-					return;
-				}
-				else if (imgData == nullptr && w == 0)
-				{
-					// Something goofed, but we can try again
-					if (r == S_OK || r == S_FALSE)
-					{
-						CoUninitialize();
-					}
+					fclose(fp);
 					return;
 				}
 			}
 			else
 			{
-				imgData = loadIcon(path, &w, &h);
+				imgData = loadIcon(img->path.c_str(), &w, &h);
 
 				if (imgData == nullptr)
 				{
@@ -506,11 +539,21 @@ void SampleImage(std::shared_ptr<Image> img)
 					img->bg2 = img->fallback_bg2;
 					img->fg1 = img->fallback_fg1;
 					img->fg2 = img->fallback_fg2;
+
+					img->l1 = img->d4 = img->bg1;
+					img->l2 = img->d3 = img->bg2;
+					img->l3 = img->d2 = img->fg1;
+					img->l4 = img->d1 = img->fg2;
+
+					img->lum = 1.0f;
+					img->avg = 0xFFFFFFFF;
+
 					img->dirty = false;
 					if (r == S_OK || r == S_FALSE)
 					{
 						CoUninitialize();
 					}
+					fclose(fp);
 					return;
 				}
 
@@ -525,6 +568,8 @@ void SampleImage(std::shared_ptr<Image> img)
 				isIcon = true;
 			}
 		}
+
+		fclose(fp);
 
 		isIcon |= img->forceIcon;
 
@@ -547,6 +592,20 @@ void SampleImage(std::shared_ptr<Image> img)
 		img->bg2 = _byteswap_ulong(chameleonGetColor(chameleon, CHAMELEON_BACKGROUND2)) | 0xFF;
 		img->fg1 = _byteswap_ulong(chameleonGetColor(chameleon, CHAMELEON_FOREGROUND1)) | 0xFF;
 		img->fg2 = _byteswap_ulong(chameleonGetColor(chameleon, CHAMELEON_FOREGROUND2)) | 0xFF;
+
+		img->l1 = _byteswap_ulong(chameleonGetColor(chameleon, CHAMELEON_LIGHT1)) | 0xFF;
+		img->l2 = _byteswap_ulong(chameleonGetColor(chameleon, CHAMELEON_LIGHT2)) | 0xFF;
+		img->l3 = _byteswap_ulong(chameleonGetColor(chameleon, CHAMELEON_LIGHT3)) | 0xFF;
+		img->l4 = _byteswap_ulong(chameleonGetColor(chameleon, CHAMELEON_LIGHT4)) | 0xFF;
+
+		img->d1 = _byteswap_ulong(chameleonGetColor(chameleon, CHAMELEON_DARK1)) | 0xFF;
+		img->d2 = _byteswap_ulong(chameleonGetColor(chameleon, CHAMELEON_DARK2)) | 0xFF;
+		img->d3 = _byteswap_ulong(chameleonGetColor(chameleon, CHAMELEON_DARK3)) | 0xFF;
+		img->d4 = _byteswap_ulong(chameleonGetColor(chameleon, CHAMELEON_DARK4)) | 0xFF;
+
+		img->avg = _byteswap_ulong(chameleonGetColor(chameleon, CHAMELEON_AVERAGE)) | 0xFF;
+
+		img->lum = chameleonGetLuminance(chameleon, CHAMELEON_AVERAGE);
 
 		destroyChameleon(chameleon);
 		chameleon = nullptr;
@@ -720,6 +779,46 @@ PLUGIN_EXPORT void Reload(void *data, void *rm, double *maxVal)
 					{
 						measure->type = MEASURE_FG2;
 					}
+					else if (color.compare(L"Luminance") == 0)
+					{
+						measure->type = MEASURE_AVG_LUM;
+					}
+					else if (color.compare(L"Average") == 0)
+					{
+						measure->type = MEASURE_AVG_COLOR;
+					}
+					else if (color.compare(L"Light1") == 0)
+					{
+						measure->type = MEASURE_L1;
+					}
+					else if (color.compare(L"Light2") == 0)
+					{
+						measure->type = MEASURE_L2;
+					}
+					else if (color.compare(L"Light3") == 0)
+					{
+						measure->type = MEASURE_L3;
+					}
+					else if (color.compare(L"Light4") == 0)
+					{
+						measure->type = MEASURE_L4;
+					}
+					else if (color.compare(L"Dark1") == 0)
+					{
+						measure->type = MEASURE_D1;
+					}
+					else if (color.compare(L"Dark2") == 0)
+					{
+						measure->type = MEASURE_D2;
+					}
+					else if (color.compare(L"Dark3") == 0)
+					{
+						measure->type = MEASURE_D3;
+					}
+					else if (color.compare(L"Dark4") == 0)
+					{
+						measure->type = MEASURE_D4;
+					}
 					else
 					{
 						RmLog(LOG_ERROR, L"Chameleon: Invalid Color=");
@@ -783,6 +882,11 @@ PLUGIN_EXPORT double Update(void *data)
 		// We're updating a child measure, it just needs to format the value from the parent
 		uint32_t value = 0;
 
+		if (measure->type == MEASURE_AVG_LUM)
+		{
+			return measure->parent->lum;
+		}
+
 		// Choose the right value
 		switch (measure->type)
 		{
@@ -797,6 +901,36 @@ PLUGIN_EXPORT double Update(void *data)
 			break;
 		case MEASURE_FG2:
 			value = measure->parent->fg2;
+			break;
+
+		case MEASURE_AVG_COLOR:
+			value = measure->parent->avg;
+			break;
+
+		case MEASURE_L1:
+			value = measure->parent->l1;
+			break;
+		case MEASURE_L2:
+			value = measure->parent->l2;
+			break;
+		case MEASURE_L3:
+			value = measure->parent->l3;
+			break;
+		case MEASURE_L4:
+			value = measure->parent->l4;
+			break;
+
+		case MEASURE_D1:
+			value = measure->parent->d1;
+			break;
+		case MEASURE_D2:
+			value = measure->parent->d2;
+			break;
+		case MEASURE_D3:
+			value = measure->parent->d3;
+			break;
+		case MEASURE_D4:
+			value = measure->parent->d4;
 			break;
 		}
 
@@ -835,6 +969,10 @@ PLUGIN_EXPORT LPCWSTR GetString(void *data)
 	if (measure->type == MEASURE_CONTAINER)
 	{
 		return img->path.c_str();
+	}
+	else if (measure->type == MEASURE_AVG_LUM)
+	{
+		return NULL;
 	}
 	else
 	{

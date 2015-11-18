@@ -10,11 +10,18 @@ extern const ChameleonParams defaultIconParams[4];
 Chameleon* createChameleon()
 {
 	Chameleon *result = new Chameleon;
-	result->background1 = result->background2 = result->foreground1 = result->foreground2 = INVALID_INDEX;
+	for (size_t i = 0; i < CHAMELEON_COLORS; ++i)
+	{
+		result->colorIndex[i] = INVALID_INDEX;
+	}
+
+	result->colorIndex[CHAMELEON_AVERAGE] = AVG_INDEX;
 
 	result->colors = static_cast<ColorStat*>(_aligned_malloc(MAX_COLOR_STATS * sizeof(ColorStat), 16));
 	
 	memset(result->colors, 0, MAX_COLOR_STATS * sizeof(ColorStat));
+
+	result->rgbFixed = false;
 
 	return result;
 }
@@ -33,6 +40,8 @@ void chameleonProcessLine(Chameleon *chameleon, const uint32_t *lineData, size_t
 
 	float edge = (edgeLine ? 1.0f : 0.0f);
 
+	__m128 rgbc;
+
 	for (size_t i = 0; i < lineWidth; ++i)
 	{
 		// Ignore pixels that are mostly transparent
@@ -41,13 +50,10 @@ void chameleonProcessLine(Chameleon *chameleon, const uint32_t *lineData, size_t
 
 		cIndex = XRGB5(lineData[i]);
 
+		rgbc = _mm_set_ps(1.0f, ((lineData[i] & 0x00FF0000) >> 16) / 255.0f, ((lineData[i] & 0x0000FF00) >> 8) / 255.0f, ((lineData[i] & 0x000000FF)) / 255.0f);
 
-		// TODO: SIMDize this?
-		stat[cIndex].r += ((lineData[i] & 0x000000FF)      ) / 255.0f;
-		stat[cIndex].g += ((lineData[i] & 0x0000FF00) >>  8) / 255.0f;
-		stat[cIndex].b += ((lineData[i] & 0x00FF0000) >> 16) / 255.0f;
-
-		stat[cIndex].count += 1.0f;
+		stat[cIndex].rgbc = _mm_add_ps(rgbc, stat[cIndex].rgbc);
+		stat[AVG_INDEX].rgbc = _mm_add_ps(rgbc, stat[AVG_INDEX].rgbc);
 
 		stat[cIndex].edgeCount += edge;
 	}
@@ -127,6 +133,8 @@ void chameleonProcessImage(Chameleon *chameleon, const uint32_t *imgData, size_t
 		chameleonProcessLine(chameleon, &imgData[imgWidth * i], imgWidth, (i == 0 || i == (imgHeight - 1)));
 	}
 
+	chameleon->rgbFixed = false;
+
 	delete[] resampledData;
 }
 
@@ -135,17 +143,28 @@ void chameleonFindKeyColors(Chameleon *chameleon, const ChameleonParams *params,
 	ColorStat *stat = chameleon->colors;
 
 	// Convert colors to YUV for processing
-	for (uint16_t i = 0; i < MAX_COLOR_STATS; ++i)
+	if (!chameleon->rgbFixed)
 	{
-		fixRGB(&stat[i]);
-		calcYUV(&stat[i]);
+		for (uint16_t i = 0; i < LAST_COLOR + 1; ++i)
+		{
+			if (stat[i].count)
+			{
+				fixRGB(&stat[i]);
+				calcYUV(&stat[i]);
+			}
+		}
+
+		fixRGB(&stat[AVG_INDEX]);
+		calcYUV(&stat[AVG_INDEX]);
+
+		chameleon->rgbFixed = true;
 	}
 
 	// First, find the first background color.
 
-	uint16_t bg1 = INVALID_INDEX;
+	uint16_t bg1 = AVG_INDEX;
 	uint16_t bg2 = INVALID_INDEX;
-	uint16_t fg1 = INVALID_INDEX;
+	uint16_t fg1 = AVG_INDEX;
 	uint16_t fg2 = INVALID_INDEX;
 
 	const ChameleonParams *bg1Param = &params[0];
@@ -155,12 +174,13 @@ void chameleonFindKeyColors(Chameleon *chameleon, const ChameleonParams *params,
 
 	float result = 1, temp = 0;
 
-	for (uint16_t i = 0; i < MAX_COLOR_STATS; ++i)
+	for (uint16_t i = 0; i < LAST_COLOR + 1; ++i)
 	{
 		if (stat[i].count > 0)
 		{
-			temp = (stat[i].count * bg1Param->countWeight) + 1;
-			temp *= (stat[i].edgeCount * bg1Param->edgeWeight) + 1;
+			temp = stat[i].count * bg1Param->countWeight;
+			temp += stat[i].edgeCount * bg1Param->edgeWeight;
+			temp += saturation(&stat[i]) * bg1Param->saturationWeight;
 
 			if (temp > result)
 			{
@@ -172,15 +192,15 @@ void chameleonFindKeyColors(Chameleon *chameleon, const ChameleonParams *params,
 
 	// Now the foreground color...
 	result = 1;
-	for (uint16_t i = 0; i < MAX_COLOR_STATS; ++i)
+	for (uint16_t i = 0; i < LAST_COLOR + 1; ++i)
 	{
 		if (i != bg1 && stat[i].count > 0)
 		{
-			temp = (stat[i].count * fg1Param->countWeight) + 1;
-			temp *= (stat[i].edgeCount * fg1Param->edgeWeight) + 1;
-			temp *= (distance(&stat[i], &stat[bg1]) * fg1Param->bg1distanceWeight) + 1;
-			temp *= (saturation(&stat[i]) * fg1Param->saturationWeight) + 1;
-			temp *= (contrast(&stat[i], &stat[bg1]) * fg1Param->contrastWeight) + 1;
+			temp = stat[i].count * fg1Param->countWeight;
+			temp += stat[i].edgeCount * fg1Param->edgeWeight;
+			temp += distance(&stat[i], &stat[bg1]) * fg1Param->bg1distanceWeight;
+			temp += saturation(&stat[i]) * fg1Param->saturationWeight;
+			temp += contrast(&stat[i], &stat[bg1]) * fg1Param->contrastWeight;
 
 			if (temp >= result)
 			{
@@ -192,16 +212,16 @@ void chameleonFindKeyColors(Chameleon *chameleon, const ChameleonParams *params,
 
 	// Second background...
 	result = 1;
-	for (uint16_t i = 0; i < MAX_COLOR_STATS; ++i)
+	for (uint16_t i = 0; i < LAST_COLOR + 1; ++i)
 	{
 		if (i != bg1 && i != fg1 && stat[i].edgeCount > 0)
 		{
-			temp = (stat[i].count * bg2Param->countWeight) + 1;
-			temp *= (stat[i].edgeCount * bg2Param->edgeWeight) + 1;
-			temp *= (distance(&stat[i], &stat[bg1]) * bg2Param->bg1distanceWeight) + 1;
-			temp *= (distance(&stat[i], &stat[fg1]) * bg2Param->fg1distanceWeight) + 1;
-			temp *= (saturation(&stat[i]) * bg2Param->saturationWeight) + 1;
-			temp *= (contrast(&stat[i], &stat[fg1]) * bg2Param->contrastWeight) + 1;
+			temp = stat[i].count * bg2Param->countWeight;
+			temp += stat[i].edgeCount * bg2Param->edgeWeight;
+			temp += distance(&stat[i], &stat[bg1]) * bg2Param->bg1distanceWeight;
+			temp += distance(&stat[i], &stat[fg1]) * bg2Param->fg1distanceWeight;
+			temp += saturation(&stat[i]) * bg2Param->saturationWeight;
+			temp += contrast(&stat[i], &stat[fg1]) * bg2Param->contrastWeight;
 
 			if (temp >= result)
 			{
@@ -213,16 +233,16 @@ void chameleonFindKeyColors(Chameleon *chameleon, const ChameleonParams *params,
 
 	// Second foreground...
 	result = 1;
-	for (uint16_t i = 0; i < MAX_COLOR_STATS; ++i)
+	for (uint16_t i = 0; i < LAST_COLOR + 1; ++i)
 	{
 		if (i != bg1 && i != fg1 && i != bg2 && stat[i].count > 0)
 		{
-			temp = (stat[i].count * fg2Param->countWeight) + 1;
-			temp *= (stat[i].edgeCount * fg2Param->edgeWeight) + 1;
-			temp *= (distance(&stat[i], &stat[bg1]) * fg2Param->bg1distanceWeight) + 1;
-			temp *= (distance(&stat[i], &stat[fg1]) * fg2Param->fg1distanceWeight) + 1;
-			temp *= (saturation(&stat[i]) * fg2Param->saturationWeight) + 1;
-			temp *= (contrast(&stat[i], &stat[bg1]) * fg2Param->contrastWeight) + 1;
+			temp = stat[i].count * fg2Param->countWeight;
+			temp += stat[i].edgeCount * fg2Param->edgeWeight;
+			temp += distance(&stat[i], &stat[bg1]) * fg2Param->bg1distanceWeight;
+			temp += distance(&stat[i], &stat[fg1]) * fg2Param->fg1distanceWeight;
+			temp += saturation(&stat[i]) * fg2Param->saturationWeight;
+			temp += contrast(&stat[i], &stat[bg1]) * fg2Param->contrastWeight;
 
 			if (temp >= result)
 			{
@@ -237,12 +257,6 @@ void chameleonFindKeyColors(Chameleon *chameleon, const ChameleonParams *params,
 		bg2 = bg1;
 	}
 
-	if (fg1 == INVALID_INDEX)
-	{
-		fg1 = bg2;
-		bg2 = bg1;
-	}
-
 	if (fg2 == INVALID_INDEX)
 	{
 		fg2 = fg1;
@@ -250,82 +264,115 @@ void chameleonFindKeyColors(Chameleon *chameleon, const ChameleonParams *params,
 
 	if (forceContrast)
 	{
-		// Set up a couple of key colors for the next step
-		if (stat[0x0000].count == 0)
-		{
-			stat[0x0000].r = stat[0x0000].g = stat[0x0000].b = 0.0f;
-		}
-
-		if (stat[0x0FFF].count == 0)
-		{
-			stat[0x0FFF].r = stat[0x0FFF].g = stat[0x0FFF].b = 1.0f;
-		}
-
 		// Find the contrast between the background and the foreground
-		if (contrast(&stat[fg1], &stat[bg1]) < MIN_CONTRAST)
+		float cont = contrast(&stat[fg1], &stat[bg1]);
+		// prevent infinite loops;
+		size_t loops;
+		if (cont < MIN_CONTRAST)
 		{
-			if (stat[bg1].y >= 0.5f)
+			stat[FG1_BACKUP_INDEX] = stat[fg1];
+			fg1 = FG1_BACKUP_INDEX;
+			loops = 0;
+			while (cont < MIN_CONTRAST && loops < 8)
 			{
-				fg1 = 0x0000;
+				if (stat[bg1].y > 0.5f)
+				{
+					stat[fg1].rgbc = _mm_div_ps(stat[fg1].rgbc, _mm_set_ps(1, 2, 2, 2));
+				}
+				else
+				{
+					stat[fg1].rgbc = _mm_div_ps(_mm_add_ps(stat[fg1].rgbc, _mm_set_ps(0, 1, 1, 1)), _mm_set_ps(1, 2, 2, 2));
+				}
+
+				cont = contrast(&stat[fg1], &stat[bg1]);
+				loops++;
 			}
-			else
-			{
-				fg1 = 0x0FFF;
-			}
+
+			calcYUV(&stat[FG1_BACKUP_INDEX]);
 		}
 
-		if (contrast(&stat[fg2], &stat[bg1]) < MIN_CONTRAST)
+		cont = contrast(&stat[fg2], &stat[bg1]);
+		if (cont < MIN_CONTRAST)
 		{
-			if (stat[bg1].y >= 0.5f)
+			stat[FG2_BACKUP_INDEX] = stat[fg2];
+			fg2 = FG2_BACKUP_INDEX;
+			loops = 0;
+			while (cont < MIN_CONTRAST && loops < 8)
 			{
-				fg2 = 0x0000;
+				if (stat[bg1].y > 0.5f)
+				{
+					stat[fg2].rgbc = _mm_div_ps(stat[fg2].rgbc, _mm_set_ps(1, 2, 2, 2));
+				}
+				else
+				{
+					stat[fg2].rgbc = _mm_div_ps(_mm_add_ps(stat[fg2].rgbc, _mm_set_ps(0, 1, 1, 1)), _mm_set_ps(1, 2, 2, 2));
+				}
+
+				cont = contrast(&stat[fg2], &stat[bg1]);
+				loops++;
 			}
-			else
+
+			calcYUV(&stat[FG2_BACKUP_INDEX]);
+		}
+	}
+
+	// Sort picked colors by brightness to fill LIGHTx and DARKx
+
+	chameleon->colorIndex[CHAMELEON_LIGHT1] = bg1;
+	chameleon->colorIndex[CHAMELEON_LIGHT2] = bg2;
+	chameleon->colorIndex[CHAMELEON_LIGHT3] = fg1;
+	chameleon->colorIndex[CHAMELEON_LIGHT4] = fg2;
+
+	for (size_t j = 0; j < 4; ++j)
+	{
+		for (size_t i = 0; i < (3 - j); ++i)
+		{
+			if (stat[chameleon->colorIndex[CHAMELEON_LIGHT1 + i]].y < stat[chameleon->colorIndex[CHAMELEON_LIGHT1 + i + 1]].y)
 			{
-				fg2 = 0x0FFF;
+				uint16_t color = chameleon->colorIndex[CHAMELEON_LIGHT1 + i];
+				chameleon->colorIndex[CHAMELEON_LIGHT1 + i] = chameleon->colorIndex[CHAMELEON_LIGHT1 + i + 1];
+				chameleon->colorIndex[CHAMELEON_LIGHT1 + i + 1] = color;
 			}
 		}
 	}
 
-	chameleon->background1 = bg1;
-	chameleon->background2 = bg2;
-	chameleon->foreground1 = fg1;
-	chameleon->foreground2 = fg2;
+	chameleon->colorIndex[CHAMELEON_DARK1] = chameleon->colorIndex[CHAMELEON_LIGHT4];
+	chameleon->colorIndex[CHAMELEON_DARK2] = chameleon->colorIndex[CHAMELEON_LIGHT3];
+	chameleon->colorIndex[CHAMELEON_DARK3] = chameleon->colorIndex[CHAMELEON_LIGHT2];
+	chameleon->colorIndex[CHAMELEON_DARK4] = chameleon->colorIndex[CHAMELEON_LIGHT1];
+
+	chameleon->colorIndex[CHAMELEON_BACKGROUND1] = bg1;
+	chameleon->colorIndex[CHAMELEON_FOREGROUND1] = fg1;
+	chameleon->colorIndex[CHAMELEON_BACKGROUND2] = bg2;
+	chameleon->colorIndex[CHAMELEON_FOREGROUND2] = fg2;
 }
 
 uint32_t chameleonGetColor(Chameleon *chameleon, ChameleonColor color)
 {
 	uint32_t result;
 
-	float r, g, b;
+	uint16_t i = chameleon->colorIndex[color];
 
-	switch (color)
+	if (i == INVALID_INDEX)
 	{
-	case CHAMELEON_BACKGROUND1:
-		r = chameleon->colors[chameleon->background1].r;
-		g = chameleon->colors[chameleon->background1].g;
-		b = chameleon->colors[chameleon->background1].b;
-		break;
-	case CHAMELEON_FOREGROUND1:
-		r = chameleon->colors[chameleon->foreground1].r;
-		g = chameleon->colors[chameleon->foreground1].g;
-		b = chameleon->colors[chameleon->foreground1].b;
-		break;
-	case CHAMELEON_BACKGROUND2:
-		r = chameleon->colors[chameleon->background2].r;
-		g = chameleon->colors[chameleon->background2].g;
-		b = chameleon->colors[chameleon->background2].b;
-		break;
-	case CHAMELEON_FOREGROUND2:
-		r = chameleon->colors[chameleon->foreground2].r;
-		g = chameleon->colors[chameleon->foreground2].g;
-		b = chameleon->colors[chameleon->foreground2].b;
-		break;
+		i = AVG_INDEX;
 	}
 
-	result = int(r * 255) | (int(g * 255) << 8) | (int(b * 255) << 16) | 0xFF000000;
+	result = int(chameleon->colors[i].r * 255) | (int(chameleon->colors[i].g * 255) << 8) | (int(chameleon->colors[i].b * 255) << 16) | 0xFF000000;
 
 	return result;
+}
+
+float chameleonGetLuminance(Chameleon *chameleon, ChameleonColor color)
+{
+	uint16_t i = chameleon->colorIndex[color];
+
+	if (i == INVALID_INDEX)
+	{
+		i = AVG_INDEX;
+	}
+
+	return chameleon->colors[i].y;
 }
 
 const ChameleonParams* chameleonDefaultImageParams()
@@ -342,8 +389,8 @@ const ChameleonParams defaultImageParams[4] =
 {
 	// BG1
 	{
-		1.0f, // countWeight
-		1.0f, // edgeWeight
+		0.5f, // countWeight
+		100.0f, // edgeWeight
 		0.0f, // bg1distanceWeight
 		0.0f, // fg1distanceWeight
 		0.0f, // saturationWeight
@@ -352,32 +399,32 @@ const ChameleonParams defaultImageParams[4] =
 
 	// FG1
 	{
-		0.04f,
+		0.188f,
+		-10.0f,
+		78.0f,
 		0.0f,
-		60.0f,
-		0.0f,
-		10.0f,
-		250.0f
+		190.0f,
+		10.0f
 	},
 
 	// BG2
 	{
-		0.5f,
-		0.0f,
-		0.0f,
-		10.0f,
+		0.75f,
+		2.0f,
+		-4469.0f,
+		100.0f,
 		0.0f,
 		10.0f
 	},
 
 	// FG2
 	{
-		0.015f,
-		0.0f,
-		60.0f,
-		0.5f,
-		200.0f,
-		0.0f
+		0.042f,
+		-1.0f,
+		24.0f,
+		100.0f,
+		146.0f,
+		8.0f
 	}
 };
 

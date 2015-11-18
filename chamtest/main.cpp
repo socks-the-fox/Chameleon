@@ -1,5 +1,7 @@
 #include <wx/wx.h>
 
+#include <chameleon.h>
+
 #include "main.h"
 #include "MainFrame.h"
 

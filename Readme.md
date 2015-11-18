@@ -74,12 +74,26 @@ tell Chameleon which measure you're getting the colors from,
 and `Color` which tells Chameleon which color you're interested
 in.
 
+The `Light` and `Dark` colors are just the selected foreground and background
+colors sorted by how light or dark they are, respectively.
+
 `Color` can be one of:
 
 * `Background1`
 * `Foreground1`
 * `Background2`
 * `Foreground2`
+* `Light1`
+* `Light2`
+* `Light3`
+* `Light4`
+* `Dark1`
+* `Dark2`
+* `Dark3`
+* `Dark4`
+* `Average` which is the overall average color of the image
+* `Luminance` which is not a color, but rather a floating point value
+between 0 and 1 indicating the average luminance of the image.
 
 Here's an example:
 

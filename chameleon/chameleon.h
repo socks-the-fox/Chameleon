@@ -9,7 +9,17 @@ extern "C" {
 		CHAMELEON_BACKGROUND1,
 		CHAMELEON_FOREGROUND1,
 		CHAMELEON_BACKGROUND2,
-		CHAMELEON_FOREGROUND2
+		CHAMELEON_FOREGROUND2,
+		CHAMELEON_AVERAGE,
+		CHAMELEON_LIGHT1,
+		CHAMELEON_LIGHT2,
+		CHAMELEON_LIGHT3,
+		CHAMELEON_LIGHT4,
+		CHAMELEON_DARK1,
+		CHAMELEON_DARK2,
+		CHAMELEON_DARK3,
+		CHAMELEON_DARK4,
+		CHAMELEON_COLORS
 	};
 
 	struct Chameleon;
@@ -47,6 +57,8 @@ extern "C" {
 		Get the specified color from the processed data
 	*/
 	uint32_t chameleonGetColor(Chameleon *chameleon, ChameleonColor color);
+
+	float chameleonGetLuminance(Chameleon *chameleon, ChameleonColor color);
 
 	/*
 		Get the default parameters for processing a non-transparent image
