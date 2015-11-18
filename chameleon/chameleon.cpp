@@ -145,7 +145,7 @@ void chameleonFindKeyColors(Chameleon *chameleon, const ChameleonParams *params,
 	// Convert colors to YUV for processing
 	if (!chameleon->rgbFixed)
 	{
-		for (uint16_t i = 0; i < LAST_COLOR; ++i)
+		for (uint16_t i = 0; i < LAST_COLOR + 1; ++i)
 		{
 			if (stat[i].count)
 			{
@@ -174,7 +174,7 @@ void chameleonFindKeyColors(Chameleon *chameleon, const ChameleonParams *params,
 
 	float result = 1, temp = 0;
 
-	for (uint16_t i = 0; i < LAST_COLOR; ++i)
+	for (uint16_t i = 0; i < LAST_COLOR + 1; ++i)
 	{
 		if (stat[i].count > 0)
 		{
@@ -192,7 +192,7 @@ void chameleonFindKeyColors(Chameleon *chameleon, const ChameleonParams *params,
 
 	// Now the foreground color...
 	result = 1;
-	for (uint16_t i = 0; i < LAST_COLOR; ++i)
+	for (uint16_t i = 0; i < LAST_COLOR + 1; ++i)
 	{
 		if (i != bg1 && stat[i].count > 0)
 		{
@@ -212,7 +212,7 @@ void chameleonFindKeyColors(Chameleon *chameleon, const ChameleonParams *params,
 
 	// Second background...
 	result = 1;
-	for (uint16_t i = 0; i < LAST_COLOR; ++i)
+	for (uint16_t i = 0; i < LAST_COLOR + 1; ++i)
 	{
 		if (i != bg1 && i != fg1 && stat[i].edgeCount > 0)
 		{
@@ -233,7 +233,7 @@ void chameleonFindKeyColors(Chameleon *chameleon, const ChameleonParams *params,
 
 	// Second foreground...
 	result = 1;
-	for (uint16_t i = 0; i < LAST_COLOR; ++i)
+	for (uint16_t i = 0; i < LAST_COLOR + 1; ++i)
 	{
 		if (i != bg1 && i != fg1 && i != bg2 && stat[i].count > 0)
 		{
@@ -338,8 +338,8 @@ void chameleonFindKeyColors(Chameleon *chameleon, const ChameleonParams *params,
 	chameleon->colorIndex[CHAMELEON_DARK4] = chameleon->colorIndex[CHAMELEON_LIGHT1];
 
 	chameleon->colorIndex[CHAMELEON_BACKGROUND1] = bg1;
-	chameleon->colorIndex[CHAMELEON_BACKGROUND2] = bg2;
 	chameleon->colorIndex[CHAMELEON_FOREGROUND1] = fg1;
+	chameleon->colorIndex[CHAMELEON_BACKGROUND2] = bg2;
 	chameleon->colorIndex[CHAMELEON_FOREGROUND2] = fg2;
 }
 
@@ -354,11 +354,7 @@ uint32_t chameleonGetColor(Chameleon *chameleon, ChameleonColor color)
 		i = AVG_INDEX;
 	}
 
-	float r = chameleon->colors[i].r;
-	float g = chameleon->colors[i].g;
-	float b = chameleon->colors[i].b;
-
-	result = int(r * 255) | (int(g * 255) << 8) | (int(b * 255) << 16) | 0xFF000000;
+	result = int(chameleon->colors[i].r * 255) | (int(chameleon->colors[i].g * 255) << 8) | (int(chameleon->colors[i].b * 255) << 16) | 0xFF000000;
 
 	return result;
 }
