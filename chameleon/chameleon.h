@@ -58,6 +58,8 @@ extern "C" {
 	*/
 	uint32_t chameleonGetColor(Chameleon *chameleon, ChameleonColor color);
 
+	float chameleonGetLuminance(Chameleon *chameleon, ChameleonColor color);
+
 	/*
 		Get the default parameters for processing a non-transparent image
 	*/

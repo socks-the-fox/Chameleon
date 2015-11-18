@@ -359,6 +359,18 @@ uint32_t chameleonGetColor(Chameleon *chameleon, ChameleonColor color)
 	return result;
 }
 
+float chameleonGetLuminance(Chameleon *chameleon, ChameleonColor color)
+{
+	uint16_t i = chameleon->colorIndex[color];
+
+	if (i == INVALID_INDEX)
+	{
+		i = AVG_INDEX;
+	}
+
+	return chameleon->colors[i].y;
+}
+
 const ChameleonParams* chameleonDefaultImageParams()
 {
 	return defaultImageParams;
