@@ -15,6 +15,8 @@ Chameleon* createChameleon()
 		result->colorIndex[i] = INVALID_INDEX;
 	}
 
+	result->colorIndex[CHAMELEON_AVERAGE] = AVG_INDEX;
+
 	result->colors = static_cast<ColorStat*>(_aligned_malloc(MAX_COLOR_STATS * sizeof(ColorStat), 16));
 	
 	memset(result->colors, 0, MAX_COLOR_STATS * sizeof(ColorStat));
@@ -160,9 +162,9 @@ void chameleonFindKeyColors(Chameleon *chameleon, const ChameleonParams *params,
 
 	// First, find the first background color.
 
-	uint16_t bg1 = INVALID_INDEX;
+	uint16_t bg1 = AVG_INDEX;
 	uint16_t bg2 = INVALID_INDEX;
-	uint16_t fg1 = INVALID_INDEX;
+	uint16_t fg1 = AVG_INDEX;
 	uint16_t fg2 = INVALID_INDEX;
 
 	const ChameleonParams *bg1Param = &params[0];
@@ -252,12 +254,6 @@ void chameleonFindKeyColors(Chameleon *chameleon, const ChameleonParams *params,
 
 	if (bg2 == INVALID_INDEX)
 	{
-		bg2 = bg1;
-	}
-
-	if (fg1 == INVALID_INDEX)
-	{
-		fg1 = bg2;
 		bg2 = bg1;
 	}
 
@@ -352,6 +348,11 @@ uint32_t chameleonGetColor(Chameleon *chameleon, ChameleonColor color)
 	uint32_t result;
 
 	uint16_t i = chameleon->colorIndex[color];
+
+	if (i == INVALID_INDEX)
+	{
+		i = AVG_INDEX;
+	}
 
 	float r = chameleon->colors[i].r;
 	float g = chameleon->colors[i].g;
