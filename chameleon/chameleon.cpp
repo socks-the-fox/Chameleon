@@ -287,6 +287,8 @@ void chameleonFindKeyColors(Chameleon *chameleon, const ChameleonParams *params,
 				cont = contrast(&stat[fg1], &stat[bg1]);
 				loops++;
 			}
+
+			calcYUV(&stat[FG1_BACKUP_INDEX]);
 		}
 
 		cont = contrast(&stat[fg2], &stat[bg1]);
@@ -309,6 +311,8 @@ void chameleonFindKeyColors(Chameleon *chameleon, const ChameleonParams *params,
 				cont = contrast(&stat[fg2], &stat[bg1]);
 				loops++;
 			}
+
+			calcYUV(&stat[FG2_BACKUP_INDEX]);
 		}
 	}
 
