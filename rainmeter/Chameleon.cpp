@@ -496,6 +496,7 @@ void SampleImage(std::shared_ptr<Image> img)
 		if (imgData == nullptr)
 		{
 			RmLog(LOG_ERROR, L"Could not load desktop!");
+			fseek(fp, 0, SEEK_SET);
 			const char *debug = stbi_failure_reason();
 			if (strcmp(debug, "1/2/4/8-bit only") == 0)
 			{
