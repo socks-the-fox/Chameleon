@@ -27,7 +27,17 @@ enum MeasureType
 	MEASURE_BG1,
 	MEASURE_BG2,
 	MEASURE_FG1,
-	MEASURE_FG2
+	MEASURE_FG2,
+	MEASURE_AVG_LUM,
+	MEASURE_AVG_COLOR,
+	MEASURE_L1,
+	MEASURE_L2,
+	MEASURE_L3,
+	MEASURE_L4,
+	MEASURE_D1,
+	MEASURE_D2,
+	MEASURE_D3,
+	MEASURE_D4
 };
 
 enum ImageType
@@ -53,10 +63,23 @@ struct Image
 	uint32_t fg1;
 	uint32_t fg2;
 
+	uint32_t l1;
+	uint32_t l2;
+	uint32_t l3;
+	uint32_t l4;
+
+	uint32_t d1;
+	uint32_t d2;
+	uint32_t d3;
+	uint32_t d4;
+
 	uint32_t fallback_bg1;
 	uint32_t fallback_bg2;
 	uint32_t fallback_fg1;
 	uint32_t fallback_fg2;
+
+	float lum;
+	uint32_t avg;
 };
 
 struct Measure
@@ -390,6 +413,15 @@ void SampleImage(std::shared_ptr<Image> img)
 			img->fg1 = _byteswap_ulong(GetSysColor(COLOR_CAPTIONTEXT)) | 0xFF;
 			img->fg2 = _byteswap_ulong(GetSysColor(COLOR_INACTIVECAPTIONTEXT)) | 0xFF;
 
+			// TODO: Actually find the brightness of these to sort it properly:
+			img->l1 = img->d4 = img->bg1;
+			img->l2 = img->d3 = img->bg2;
+			img->l3 = img->d2 = img->fg1;
+			img->l4 = img->d1 = img->fg2;
+
+			img->lum = 1.0f;
+			img->avg = 0xFFFFFFFF;
+
 			img->dirty = false;
 		}
 	}
@@ -403,6 +435,16 @@ void SampleImage(std::shared_ptr<Image> img)
 			img->bg2 = img->fallback_bg2;
 			img->fg1 = img->fallback_fg1;
 			img->fg2 = img->fallback_fg2;
+
+			// TODO: Actually find the brightness of these to sort it properly:
+			img->l1 = img->d4 = img->bg1;
+			img->l2 = img->d3 = img->bg2;
+			img->l3 = img->d2 = img->fg1;
+			img->l4 = img->d1 = img->fg2;
+
+			img->lum = 1.0f;
+			img->avg = 0xFFFFFFFF;
+
 			img->dirty = false;
 
 			if (r == S_OK || r == S_FALSE)
@@ -467,6 +509,15 @@ void SampleImage(std::shared_ptr<Image> img)
 					img->bg2 = img->fallback_bg2;
 					img->fg1 = img->fallback_fg1;
 					img->fg2 = img->fallback_fg2;
+
+					img->l1 = img->d4 = img->bg1;
+					img->l2 = img->d3 = img->bg2;
+					img->l3 = img->d2 = img->fg1;
+					img->l4 = img->d1 = img->fg2;
+
+					img->lum = 1.0f;
+					img->avg = 0xFFFFFFFF;
+
 					img->dirty = false;
 					if (r == S_OK || r == S_FALSE)
 					{
@@ -487,6 +538,15 @@ void SampleImage(std::shared_ptr<Image> img)
 					img->bg2 = img->fallback_bg2;
 					img->fg1 = img->fallback_fg1;
 					img->fg2 = img->fallback_fg2;
+
+					img->l1 = img->d4 = img->bg1;
+					img->l2 = img->d3 = img->bg2;
+					img->l3 = img->d2 = img->fg1;
+					img->l4 = img->d1 = img->fg2;
+
+					img->lum = 1.0f;
+					img->avg = 0xFFFFFFFF;
+
 					img->dirty = false;
 					if (r == S_OK || r == S_FALSE)
 					{
@@ -531,6 +591,20 @@ void SampleImage(std::shared_ptr<Image> img)
 		img->bg2 = _byteswap_ulong(chameleonGetColor(chameleon, CHAMELEON_BACKGROUND2)) | 0xFF;
 		img->fg1 = _byteswap_ulong(chameleonGetColor(chameleon, CHAMELEON_FOREGROUND1)) | 0xFF;
 		img->fg2 = _byteswap_ulong(chameleonGetColor(chameleon, CHAMELEON_FOREGROUND2)) | 0xFF;
+
+		img->l1 = _byteswap_ulong(chameleonGetColor(chameleon, CHAMELEON_LIGHT1)) | 0xFF;
+		img->l2 = _byteswap_ulong(chameleonGetColor(chameleon, CHAMELEON_LIGHT2)) | 0xFF;
+		img->l3 = _byteswap_ulong(chameleonGetColor(chameleon, CHAMELEON_LIGHT3)) | 0xFF;
+		img->l4 = _byteswap_ulong(chameleonGetColor(chameleon, CHAMELEON_LIGHT4)) | 0xFF;
+
+		img->d1 = _byteswap_ulong(chameleonGetColor(chameleon, CHAMELEON_DARK1)) | 0xFF;
+		img->d2 = _byteswap_ulong(chameleonGetColor(chameleon, CHAMELEON_DARK2)) | 0xFF;
+		img->d3 = _byteswap_ulong(chameleonGetColor(chameleon, CHAMELEON_DARK3)) | 0xFF;
+		img->d4 = _byteswap_ulong(chameleonGetColor(chameleon, CHAMELEON_DARK4)) | 0xFF;
+
+		img->avg = _byteswap_ulong(chameleonGetColor(chameleon, CHAMELEON_AVERAGE)) | 0xFF;
+
+		img->lum = chameleonGetLuminance(chameleon, CHAMELEON_AVERAGE);
 
 		destroyChameleon(chameleon);
 		chameleon = nullptr;
@@ -704,6 +778,46 @@ PLUGIN_EXPORT void Reload(void *data, void *rm, double *maxVal)
 					{
 						measure->type = MEASURE_FG2;
 					}
+					else if (color.compare(L"Luminance") == 0)
+					{
+						measure->type = MEASURE_AVG_LUM;
+					}
+					else if (color.compare(L"Average") == 0)
+					{
+						measure->type = MEASURE_AVG_COLOR;
+					}
+					else if (color.compare(L"Light1") == 0)
+					{
+						measure->type = MEASURE_L1;
+					}
+					else if (color.compare(L"Light2") == 0)
+					{
+						measure->type = MEASURE_L2;
+					}
+					else if (color.compare(L"Light3") == 0)
+					{
+						measure->type = MEASURE_L3;
+					}
+					else if (color.compare(L"Light4") == 0)
+					{
+						measure->type = MEASURE_L4;
+					}
+					else if (color.compare(L"Dark1") == 0)
+					{
+						measure->type = MEASURE_D1;
+					}
+					else if (color.compare(L"Dark2") == 0)
+					{
+						measure->type = MEASURE_D2;
+					}
+					else if (color.compare(L"Dark3") == 0)
+					{
+						measure->type = MEASURE_D3;
+					}
+					else if (color.compare(L"Dark4") == 0)
+					{
+						measure->type = MEASURE_D4;
+					}
 					else
 					{
 						RmLog(LOG_ERROR, L"Chameleon: Invalid Color=");
@@ -767,6 +881,11 @@ PLUGIN_EXPORT double Update(void *data)
 		// We're updating a child measure, it just needs to format the value from the parent
 		uint32_t value = 0;
 
+		if (measure->type == MEASURE_AVG_LUM)
+		{
+			return measure->parent->lum;
+		}
+
 		// Choose the right value
 		switch (measure->type)
 		{
@@ -781,6 +900,36 @@ PLUGIN_EXPORT double Update(void *data)
 			break;
 		case MEASURE_FG2:
 			value = measure->parent->fg2;
+			break;
+
+		case MEASURE_AVG_COLOR:
+			value = measure->parent->avg;
+			break;
+
+		case MEASURE_L1:
+			value = measure->parent->l1;
+			break;
+		case MEASURE_L2:
+			value = measure->parent->l2;
+			break;
+		case MEASURE_L3:
+			value = measure->parent->l3;
+			break;
+		case MEASURE_L4:
+			value = measure->parent->l4;
+			break;
+
+		case MEASURE_D1:
+			value = measure->parent->d1;
+			break;
+		case MEASURE_D2:
+			value = measure->parent->d2;
+			break;
+		case MEASURE_D3:
+			value = measure->parent->d3;
+			break;
+		case MEASURE_D4:
+			value = measure->parent->d4;
 			break;
 		}
 
@@ -819,6 +968,10 @@ PLUGIN_EXPORT LPCWSTR GetString(void *data)
 	if (measure->type == MEASURE_CONTAINER)
 	{
 		return img->path.c_str();
+	}
+	else if (measure->type == MEASURE_AVG_LUM)
+	{
+		return NULL;
 	}
 	else
 	{
