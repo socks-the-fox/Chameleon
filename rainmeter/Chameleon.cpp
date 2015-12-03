@@ -332,7 +332,6 @@ void SampleImage(std::shared_ptr<Image> img)
 			MONITORINFO monInf;
 			monInf.cbSize = sizeof(MONITORINFO);
 			GetMonitorInfo(mon, &monInf);
-			CloseHandle(mon);
 
 			// Now set up the new API
 
@@ -389,81 +388,43 @@ void SampleImage(std::shared_ptr<Image> img)
 			img->path = path;
 			img->dirty = true;
 		}
-		else
-		{
-			// Check the file modification time
-			HANDLE file = CreateFileW(img->path.c_str(), GENERIC_READ, FILE_SHARE_DELETE | FILE_SHARE_WRITE | FILE_SHARE_READ, NULL, OPEN_ALWAYS, 0, NULL);
-			FILETIME ft;
-			GetFileTime(file, NULL, NULL, &ft);
-			CloseHandle(file);
-
-			if (ft.dwHighDateTime != img->lastMod.dwHighDateTime || ft.dwLowDateTime != img->lastMod.dwLowDateTime)
-			{
-				// Same path, but different modification times...
-				img->lastMod.dwHighDateTime = ft.dwHighDateTime;
-				img->lastMod.dwLowDateTime = ft.dwLowDateTime;
-				img->dirty = true;
-			}
-		}
-
-		// Special case! User doesn't have a background image:
-		if (img->path.length() == 0)
-		{
-			img->bg1 = _byteswap_ulong(GetSysColor(COLOR_ACTIVECAPTION)) | 0xFF;
-			img->bg2 = _byteswap_ulong(GetSysColor(COLOR_INACTIVECAPTION)) | 0xFF;
-			img->fg1 = _byteswap_ulong(GetSysColor(COLOR_CAPTIONTEXT)) | 0xFF;
-			img->fg2 = _byteswap_ulong(GetSysColor(COLOR_INACTIVECAPTIONTEXT)) | 0xFF;
-
-			// TODO: Actually find the brightness of these to sort it properly:
-			img->l1 = img->d4 = img->bg1;
-			img->l2 = img->d3 = img->bg2;
-			img->l3 = img->d2 = img->fg1;
-			img->l4 = img->d1 = img->fg2;
-
-			img->lum = 1.0f;
-			img->avg = 0xFFFFFFFF;
-
-			img->dirty = false;
-		}
 	}
-	else
+
+	// Let's check the path
+	if (img->path.empty())
 	{
-		// it's a file, let's check the path
-		if (img->path.empty())
-		{
-			// Empty path! Let's dump some default values and be done with it...
-			img->bg1 = img->fallback_bg1;
-			img->bg2 = img->fallback_bg2;
-			img->fg1 = img->fallback_fg1;
-			img->fg2 = img->fallback_fg2;
+		// Empty path! Let's dump some default values and be done with it...
+		img->bg1 = img->fallback_bg1;
+		img->bg2 = img->fallback_bg2;
+		img->fg1 = img->fallback_fg1;
+		img->fg2 = img->fallback_fg2;
 
-			// TODO: Actually find the brightness of these to sort it properly:
-			img->l1 = img->d4 = img->bg1;
-			img->l2 = img->d3 = img->bg2;
-			img->l3 = img->d2 = img->fg1;
-			img->l4 = img->d1 = img->fg2;
+		// TODO: Actually find the brightness of these to sort it properly:
+		img->l1 = img->d4 = img->bg1;
+		img->l2 = img->d3 = img->bg2;
+		img->l3 = img->d2 = img->fg1;
+		img->l4 = img->d1 = img->fg2;
 
-			img->lum = 1.0f;
-			img->avg = 0xFFFFFFFF;
+		img->lum = 1.0f;
+		img->avg = 0xFFFFFFFF;
 
-			img->dirty = false;
+		img->dirty = false;
 
-			return;
-		}
+		return;
+	}
 
-		// Now the "file modified" time
-		HANDLE file = CreateFileW(img->path.c_str(), GENERIC_READ, FILE_SHARE_DELETE | FILE_SHARE_WRITE | FILE_SHARE_READ, NULL, OPEN_ALWAYS, 0, NULL);
-		FILETIME ft;
-		GetFileTime(file, NULL, NULL, &ft);
-		CloseHandle(file);
+	// Now the "file modified" time
+	HANDLE file = CreateFileW(img->path.c_str(), GENERIC_READ, FILE_SHARE_DELETE | FILE_SHARE_WRITE | FILE_SHARE_READ, NULL, OPEN_ALWAYS, 0, NULL);
+	FILETIME ft;
+	GetFileTime(file, NULL, NULL, &ft);
+	CloseHandle(file);
 
-		if (ft.dwHighDateTime != img->lastMod.dwHighDateTime || ft.dwLowDateTime != img->lastMod.dwLowDateTime)
-		{
-			// Same path, but different modification times...
-			img->lastMod.dwHighDateTime = ft.dwHighDateTime;
-			img->lastMod.dwLowDateTime = ft.dwLowDateTime;
-			img->dirty = true;
-		}
+	if (ft.dwHighDateTime != img->lastMod.dwHighDateTime || ft.dwLowDateTime != img->lastMod.dwLowDateTime)
+	{
+		// Different modification times...
+		img->lastMod.dwHighDateTime = ft.dwHighDateTime;
+		img->lastMod.dwLowDateTime = ft.dwLowDateTime;
+		img->dirty = true;
 	}
 
 	if (img->dirty)
