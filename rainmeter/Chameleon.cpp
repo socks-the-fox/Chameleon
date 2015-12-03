@@ -335,6 +335,7 @@ void SampleImage(std::shared_ptr<Image> img)
 			MONITORINFO monInf;
 			monInf.cbSize = sizeof(MONITORINFO);
 			GetMonitorInfo(mon, &monInf);
+			CloseHandle(mon);
 
 			// Now set up the new API
 
