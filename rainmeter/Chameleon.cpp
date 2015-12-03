@@ -362,11 +362,12 @@ void SampleImage(std::shared_ptr<Image> img)
 						wp->GetWallpaper(monPath, &wallPath);
 						path = wallPath;
 						CoTaskMemFree(wallPath);
+						CoTaskMemFree(monPath);
 						break;
 					}
-				}
 
-				CoTaskMemFree(monPath);
+					CoTaskMemFree(monPath);
+				}
 			}
 
 			// Clean up
