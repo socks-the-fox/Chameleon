@@ -116,7 +116,6 @@ Color=Background1
 
 */
 
-std::shared_ptr<Image> desktopImg = nullptr;
 std::vector< std::weak_ptr<Image> > images;
 static const WCHAR whex[] = L"0123456789ABCDEF";
 
@@ -317,8 +316,6 @@ uint32_t* loadIcon(const wchar_t *path, int *w, int *h)
 
 void SampleImage(std::shared_ptr<Image> img)
 {
-	HRESULT r = CoInitializeEx(NULL, COINIT_SPEED_OVER_MEMORY);
-
 	bool isIcon = false;
 
 	// If we're sampling the desktop, grab that
@@ -451,10 +448,6 @@ void SampleImage(std::shared_ptr<Image> img)
 
 			img->dirty = false;
 
-			if (r == S_OK || r == S_FALSE)
-			{
-				CoUninitialize();
-			}
 			return;
 		}
 
@@ -486,10 +479,6 @@ void SampleImage(std::shared_ptr<Image> img)
 		if (_wfopen_s(&fp, img->path.c_str(), L"rb") != 0)
 		{
 			// Something goofed, but we can try again
-			if (r == S_OK || r == S_FALSE)
-			{
-				CoUninitialize();
-			}
 			return;
 		}
 
@@ -524,10 +513,7 @@ void SampleImage(std::shared_ptr<Image> img)
 					img->avg = 0xFFFFFFFF;
 
 					img->dirty = false;
-					if (r == S_OK || r == S_FALSE)
-					{
-						CoUninitialize();
-					}
+
 					fclose(fp);
 					return;
 				}
@@ -553,10 +539,7 @@ void SampleImage(std::shared_ptr<Image> img)
 					img->avg = 0xFFFFFFFF;
 
 					img->dirty = false;
-					if (r == S_OK || r == S_FALSE)
-					{
-						CoUninitialize();
-					}
+
 					fclose(fp);
 					return;
 				}
@@ -617,11 +600,6 @@ void SampleImage(std::shared_ptr<Image> img)
 		stbi_image_free(imgData);
 
 		img->dirty = false;
-	}
-
-	if (r == S_OK || r == S_FALSE)
-	{
-		CoUninitialize();
 	}
 }
 
