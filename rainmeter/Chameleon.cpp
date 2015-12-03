@@ -364,9 +364,12 @@ void SampleImage(std::shared_ptr<Image> img)
 						// It's the monitor we're looking for!
 						wp->GetWallpaper(monPath, &wallPath);
 						path = wallPath;
+						CoTaskMemFree(wallPath);
 						break;
 					}
 				}
+
+				CoTaskMemFree(monPath);
 			}
 
 			// Clean up
