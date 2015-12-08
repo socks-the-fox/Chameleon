@@ -19,8 +19,6 @@
 #define STBI__X86_TARGET
 #include "stb_image.h"
 
-#include <png.h>
-
 enum MeasureType
 {
 	MEASURE_CONTAINER,
@@ -127,107 +125,6 @@ PLUGIN_EXPORT LPCWSTR GetString(void *data);
 PLUGIN_EXPORT void Finalize(void *data);
 
 _COM_SMARTPTR_TYPEDEF(IImageList, __uuidof(IImageList));
-
-// I so very hope stbi adds support for 16-bit-per-channel PNG files
-// so I can dump libPNG. Not that I have anything against it, but
-// it's a bit hefty to use for literally only the one specific
-// subtype of PNG...
-uint32_t* loadPNG16(FILE *fp, int *w, int *h)
-{
-	uint32_t *imgData = nullptr;
-	*w = -1;
-	*h = -1;
-
-	// Normally we would think "it has to be a PNG or we wouldn't be here"
-	// But since we close the file (in the stbi library) and then re-open
-	// it here, there's the potential that the OS could go in and swap the
-	// image between accesses.
-	png_byte sig[8];
-	fread(sig, 1, 8, fp);
-	if (png_sig_cmp(sig, 0, 8) != 0)
-	{
-		// Nope, not a PNG anymore! Let's try again next update...
-		fclose(fp);
-		return imgData;
-	}
-
-	png_structp png_ptr = png_create_read_struct(PNG_LIBPNG_VER_STRING, nullptr, nullptr, nullptr);
-	if (!png_ptr)
-	{
-		// Something happened that we couldn't set up...
-		// Most likely won't be able to fix it next go-around so bail.
-		fclose(fp);
-		return imgData;
-	}
-
-	png_infop info_ptr = png_create_info_struct(png_ptr);
-	if (!info_ptr)
-	{
-		// Again, bail.
-		png_destroy_read_struct(&png_ptr, nullptr, nullptr);
-		fclose(fp);
-		return imgData;
-	}
-
-	png_init_io(png_ptr, fp);
-	png_set_sig_bytes(png_ptr, 8);
-
-	// Grab the info we need so we don't have to move data so much
-	png_read_info(png_ptr, info_ptr);
-
-	*h = png_get_image_height(png_ptr, info_ptr);
-	*w = png_get_image_width(png_ptr, info_ptr);
-	uint32_t ct = png_get_color_type(png_ptr, info_ptr);
-
-	// Use stbi__malloc to allocate imgData to simplify code
-	imgData = (uint32_t*)stbi__malloc((*w) * (*h) * sizeof(uint32_t));
-
-	// Set up row pointers
-	png_bytep *rows = new png_bytep[*h];
-
-	for (size_t i = 0; i < *h; ++i)
-	{
-		png_bytep val = (png_bytep)(&imgData[(*w) * i]);
-		rows[i] = val;
-	}
-
-	png_set_rows(png_ptr, info_ptr, rows);
-
-	// Dinky convert 16-bit to 8-bit as quickly as possible. Upconvert tiny pixels. Make sure colors are what we expect.
-	if (ct == PNG_COLOR_TYPE_PALETTE)
-	{
-		png_set_palette_to_rgb(png_ptr);
-	}
-	else if (ct == PNG_COLOR_TYPE_GRAY || ct == PNG_COLOR_TYPE_GRAY_ALPHA)
-	{
-		png_set_gray_to_rgb(png_ptr);
-	}
-
-	if (png_get_bit_depth(png_ptr, info_ptr) == 16)
-	{
-		png_set_strip_16(png_ptr);
-	}
-
-	png_set_filler(png_ptr, 0xFF, PNG_FILLER_AFTER);
-
-	png_color_16 bg;
-	bg.red = 0;
-	bg.green = 0;
-	bg.blue = 0;
-	png_set_background(png_ptr, &bg, PNG_BACKGROUND_GAMMA_SCREEN, 0, 1);
-
-	png_set_interlace_handling(png_ptr);
-
-	png_read_update_info(png_ptr, info_ptr);
-
-	png_read_image(png_ptr, rows);
-
-	// Cleanup!
-	png_destroy_read_struct(&png_ptr, &info_ptr, nullptr);
-	delete[] rows;
-
-	return imgData;
-}
 
 uint32_t* loadIcon(const wchar_t *path, int *w, int *h)
 {
@@ -450,72 +347,42 @@ void SampleImage(std::shared_ptr<Image> img)
 
 		if (imgData == nullptr)
 		{
-			RmLog(LOG_ERROR, L"Could not load desktop!");
+			RmLog(LOG_ERROR, L"Could not load file!");
 			fseek(fp, 0, SEEK_SET);
-			const char *debug = stbi_failure_reason();
-			if (strcmp(debug, "1/2/4/8-bit only") == 0)
+
+			imgData = loadIcon(img->path.c_str(), &w, &h);
+
+			if (imgData == nullptr)
 			{
-				// It's a 16-bit PNG, time to do this manually
-				imgData = loadPNG16(fp, &w, &h);
+				// It's something we don't actually know how to handle, so let's not.
+				img->bg1 = img->fallback_bg1;
+				img->bg2 = img->fallback_bg2;
+				img->fg1 = img->fallback_fg1;
+				img->fg2 = img->fallback_fg2;
 
-				if (imgData == nullptr && w == -1)
-				{
-					// Something goofed, don't bother continuing
-					img->bg1 = img->fallback_bg1;
-					img->bg2 = img->fallback_bg2;
-					img->fg1 = img->fallback_fg1;
-					img->fg2 = img->fallback_fg2;
+				img->l1 = img->d4 = img->bg1;
+				img->l2 = img->d3 = img->bg2;
+				img->l3 = img->d2 = img->fg1;
+				img->l4 = img->d1 = img->fg2;
 
-					img->l1 = img->d4 = img->bg1;
-					img->l2 = img->d3 = img->bg2;
-					img->l3 = img->d2 = img->fg1;
-					img->l4 = img->d1 = img->fg2;
+				img->lum = 1.0f;
+				img->avg = 0xFFFFFFFF;
 
-					img->lum = 1.0f;
-					img->avg = 0xFFFFFFFF;
+				img->dirty = false;
 
-					img->dirty = false;
-
-					fclose(fp);
-					return;
-				}
+				fclose(fp);
+				return;
 			}
-			else
+
+			// RGB swap image data?
+			uint32_t temp = 0;
+			for (size_t i = 0; i < w * h; ++i)
 			{
-				imgData = loadIcon(img->path.c_str(), &w, &h);
-
-				if (imgData == nullptr)
-				{
-					// It's something we don't actually know how to handle, so let's not.
-					img->bg1 = img->fallback_bg1;
-					img->bg2 = img->fallback_bg2;
-					img->fg1 = img->fallback_fg1;
-					img->fg2 = img->fallback_fg2;
-
-					img->l1 = img->d4 = img->bg1;
-					img->l2 = img->d3 = img->bg2;
-					img->l3 = img->d2 = img->fg1;
-					img->l4 = img->d1 = img->fg2;
-
-					img->lum = 1.0f;
-					img->avg = 0xFFFFFFFF;
-
-					img->dirty = false;
-
-					fclose(fp);
-					return;
-				}
-
-				// RGB swap image data?
-				uint32_t temp = 0;
-				for (size_t i = 0; i < w * h; ++i)
-				{
-					temp = imgData[i];
-					imgData[i] = (temp & 0xFF000000) | ((temp & 0x00FF0000) >> 16) | (temp & 0x0000FF00) | ((temp & 0x000000FF) << 16);
-				}
-
-				isIcon = true;
+				temp = imgData[i];
+				imgData[i] = (temp & 0xFF000000) | ((temp & 0x00FF0000) >> 16) | (temp & 0x0000FF00) | ((temp & 0x000000FF) << 16);
 			}
+
+			isIcon = true;
 		}
 
 		fclose(fp);

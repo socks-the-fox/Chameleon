@@ -71,19 +71,19 @@
     <LibraryPath>..\Debug;..\..\rainmeter\API\x32;$(LibraryPath)</LibraryPath>
   </PropertyGroup>
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">
-    <IncludePath>..\..\lpng1618;..\..\rainmeter\API;..\chameleon;$(IncludePath)</IncludePath>
+    <IncludePath>..\..\rainmeter\API;..\chameleon;$(IncludePath)</IncludePath>
     <TargetName>Chameleon</TargetName>
-    <LibraryPath>..\..\lpng1618\projects\vstudio\Release Library;..\..\rainmeter\API\x32;..\Release;$(LibraryPath)</LibraryPath>
+    <LibraryPath>..\..\rainmeter\API\x32;..\Release;$(LibraryPath)</LibraryPath>
     <OutDir>$(SolutionDir)\ExampleSkin\Socks\@Resources\Plugin\$(PlatformShortName)\</OutDir>
   </PropertyGroup>
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">
-    <IncludePath>..\..\lpng1618;..\..\rainmeter\API;..\chameleon;$(IncludePath)</IncludePath>
-    <LibraryPath>..\..\lpng1618\projects\vstudio\x64\Debug Library;..\x64\Debug;..\..\rainmeter\API\x64;$(LibraryPath)</LibraryPath>
+    <IncludePath>..\..\rainmeter\API;..\chameleon;$(IncludePath)</IncludePath>
+    <LibraryPath>..\x64\Debug;..\..\rainmeter\API\x64;$(LibraryPath)</LibraryPath>
     <TargetName>Chameleon</TargetName>
   </PropertyGroup>
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Release|x64'">
-    <IncludePath>..\..\lpng1618;..\..\rainmeter\API;..\chameleon;$(IncludePath)</IncludePath>
-    <LibraryPath>..\..\lpng1618\projects\vstudio\x64\Release Library;..\x64\Release;..\..\rainmeter\API\x64;$(LibraryPath)</LibraryPath>
+    <IncludePath>..\..\rainmeter\API;..\chameleon;$(IncludePath)</IncludePath>
+    <LibraryPath>..\x64\Release;..\..\rainmeter\API\x64;$(LibraryPath)</LibraryPath>
     <TargetName>Chameleon</TargetName>
     <OutDir>$(SolutionDir)\ExampleSkin\Socks\@Resources\Plugin\$(PlatformShortName)\</OutDir>
   </PropertyGroup>
@@ -107,7 +107,7 @@
     </ClCompile>
     <Link>
       <GenerateDebugInformation>true</GenerateDebugInformation>
-      <AdditionalDependencies>zlib.lib;libpng16.lib;chameleon.lib;Rainmeter.lib;%(AdditionalDependencies)</AdditionalDependencies>
+      <AdditionalDependencies>chameleon.lib;Rainmeter.lib;%(AdditionalDependencies)</AdditionalDependencies>
       <ImportLibrary>$(OutDir)rainmeterplugin.lib</ImportLibrary>
     </Link>
     <PostBuildEvent />
@@ -125,7 +125,7 @@
       <EnableCOMDATFolding>true</EnableCOMDATFolding>
       <OptimizeReferences>true</OptimizeReferences>
       <ImportLibrary>$(SolutionDir)$(Configuration)\rainmeterplugin.lib</ImportLibrary>
-      <AdditionalDependencies>chameleon.lib;rainmeter.lib;libpng16.lib;zlib.lib;%(AdditionalDependencies)</AdditionalDependencies>
+      <AdditionalDependencies>chameleon.lib;rainmeter.lib;%(AdditionalDependencies)</AdditionalDependencies>
     </Link>
   </ItemDefinitionGroup>
   <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Release|x64'">
@@ -140,7 +140,7 @@
       <GenerateDebugInformation>false</GenerateDebugInformation>
       <EnableCOMDATFolding>true</EnableCOMDATFolding>
       <OptimizeReferences>true</OptimizeReferences>
-      <AdditionalDependencies>zlib.lib;libpng16.lib;chameleon.lib;Rainmeter.lib;%(AdditionalDependencies)</AdditionalDependencies>
+      <AdditionalDependencies>chameleon.lib;Rainmeter.lib;%(AdditionalDependencies)</AdditionalDependencies>
       <ImportLibrary>$(SolutionDir)$(Platform)\$(Configuration)\rainmeterplugin.lib</ImportLibrary>
     </Link>
   </ItemDefinitionGroup>
