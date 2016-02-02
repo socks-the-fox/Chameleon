@@ -211,6 +211,23 @@ uint32_t* loadIcon(const wchar_t *path, int *w, int *h)
 	return imgData;
 }
 
+inline void useDefaultColors(std::shared_ptr<Image> img)
+{
+   img->bg1 = img->fallback_bg1;
+   img->bg2 = img->fallback_bg2;
+   img->fg1 = img->fallback_fg1;
+   img->fg2 = img->fallback_fg2;
+
+   // TODO: Actually find the brightness of these to sort it properly:
+   img->l1 = img->d4 = img->bg1;
+   img->l2 = img->d3 = img->bg2;
+   img->l3 = img->d2 = img->fg1;
+   img->l4 = img->d1 = img->fg2;
+
+   img->lum = 1.0f;
+   img->avg = 0xFFFFFFFF;
+}
+
 void SampleImage(std::shared_ptr<Image> img)
 {
 	bool isIcon = false;
@@ -242,18 +259,7 @@ void SampleImage(std::shared_ptr<Image> img)
          if (wp == nullptr)
          {
             // We couldn't get the wallpaper info. Just use the fallback colors
-            img->bg1 = img->fallback_bg1;
-            img->bg2 = img->fallback_bg2;
-            img->fg1 = img->fallback_fg1;
-            img->fg2 = img->fallback_fg2;
-
-            img->l1 = img->d4 = img->bg1;
-            img->l2 = img->d3 = img->bg2;
-            img->l3 = img->d2 = img->fg1;
-            img->l4 = img->d1 = img->fg2;
-
-            img->lum = 1.0f;
-            img->avg = 0xFFFFFFFF;
+            useDefaultColors(img);
 
             img->dirty = false;
 
@@ -319,19 +325,7 @@ void SampleImage(std::shared_ptr<Image> img)
 	if (img->path.empty())
 	{
 		// Empty path! Let's dump some default values and be done with it...
-		img->bg1 = img->fallback_bg1;
-		img->bg2 = img->fallback_bg2;
-		img->fg1 = img->fallback_fg1;
-		img->fg2 = img->fallback_fg2;
-
-		// TODO: Actually find the brightness of these to sort it properly:
-		img->l1 = img->d4 = img->bg1;
-		img->l2 = img->d3 = img->bg2;
-		img->l3 = img->d2 = img->fg1;
-		img->l4 = img->d1 = img->fg2;
-
-		img->lum = 1.0f;
-		img->avg = 0xFFFFFFFF;
+      useDefaultColors(img);
 
 		img->dirty = false;
 
@@ -347,18 +341,7 @@ void SampleImage(std::shared_ptr<Image> img)
       debug += img->path;
       RmLog(LOG_ERROR, debug.c_str());
 
-      img->bg1 = img->fallback_bg1;
-      img->bg2 = img->fallback_bg2;
-      img->fg1 = img->fallback_fg1;
-      img->fg2 = img->fallback_fg2;
-
-      img->l1 = img->d4 = img->bg1;
-      img->l2 = img->d3 = img->bg2;
-      img->l3 = img->d2 = img->fg1;
-      img->l4 = img->d1 = img->fg2;
-
-      img->lum = 1.0f;
-      img->avg = 0xFFFFFFFF;
+      useDefaultColors(img);
 
       img->dirty = false;
 
@@ -408,18 +391,7 @@ void SampleImage(std::shared_ptr<Image> img)
 			if (imgData == nullptr)
 			{
 				// It's something we don't actually know how to handle, so let's not.
-				img->bg1 = img->fallback_bg1;
-				img->bg2 = img->fallback_bg2;
-				img->fg1 = img->fallback_fg1;
-				img->fg2 = img->fallback_fg2;
-
-				img->l1 = img->d4 = img->bg1;
-				img->l2 = img->d3 = img->bg2;
-				img->l3 = img->d2 = img->fg1;
-				img->l4 = img->d1 = img->fg2;
-
-				img->lum = 1.0f;
-				img->avg = 0xFFFFFFFF;
+            useDefaultColors(img);
 
 				img->dirty = false;
 
