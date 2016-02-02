@@ -239,6 +239,26 @@ void SampleImage(std::shared_ptr<Image> img)
 			IDesktopWallpaper *wp = nullptr;
 
 			CoCreateInstance(__uuidof(DesktopWallpaper), NULL, CLSCTX_ALL, IID_PPV_ARGS(&wp));
+         if (wp == nullptr)
+         {
+            // We couldn't get the wallpaper info. Just use the fallback colors
+            img->bg1 = img->fallback_bg1;
+            img->bg2 = img->fallback_bg2;
+            img->fg1 = img->fallback_fg1;
+            img->fg2 = img->fallback_fg2;
+
+            img->l1 = img->d4 = img->bg1;
+            img->l2 = img->d3 = img->bg2;
+            img->l3 = img->d2 = img->fg1;
+            img->l4 = img->d1 = img->fg2;
+
+            img->lum = 1.0f;
+            img->avg = 0xFFFFFFFF;
+
+            img->dirty = false;
+
+            return;
+         }
 
 			// Count the monitors
 			UINT monCount = 0;
@@ -273,10 +293,17 @@ void SampleImage(std::shared_ptr<Image> img)
 		else
 		{
 			// Use the "boring" WinXP - Win7 version
-			WCHAR wallPath[MAX_PATH];
-			ZeroMemory((void*)wallPath, sizeof(WCHAR) * MAX_PATH);
-			SystemParametersInfoW(SPI_GETDESKWALLPAPER, MAX_PATH, (void*)wallPath, 0);
-			path = wallPath;
+			WCHAR wallPath[MAX_PATH + 1];
+			ZeroMemory((void*)wallPath, sizeof(WCHAR) * (MAX_PATH + 1));
+
+         if (SystemParametersInfoW(SPI_GETDESKWALLPAPER, MAX_PATH, (void*)wallPath, 0))
+         {
+            path = wallPath;
+         }
+         else
+         {
+            path = L"";
+         }
 		}
 
 		// First, is the current path the same as the new path
@@ -312,7 +339,32 @@ void SampleImage(std::shared_ptr<Image> img)
 	}
 
 	// Now the "file modified" time
-	HANDLE file = CreateFileW(img->path.c_str(), GENERIC_READ, FILE_SHARE_DELETE | FILE_SHARE_WRITE | FILE_SHARE_READ, NULL, OPEN_ALWAYS, 0, NULL);
+	HANDLE file = CreateFileW(img->path.c_str(), 0, FILE_SHARE_DELETE | FILE_SHARE_WRITE | FILE_SHARE_READ, NULL, OPEN_EXISTING, 0, NULL);
+   if (file == INVALID_HANDLE_VALUE)
+   {
+      // Couldn't get the last accessed time for the file.
+      std::wstring debug = L"Chameleon: Could not get handle on ";
+      debug += img->path;
+      RmLog(LOG_ERROR, debug.c_str());
+
+      img->bg1 = img->fallback_bg1;
+      img->bg2 = img->fallback_bg2;
+      img->fg1 = img->fallback_fg1;
+      img->fg2 = img->fallback_fg2;
+
+      img->l1 = img->d4 = img->bg1;
+      img->l2 = img->d3 = img->bg2;
+      img->l3 = img->d2 = img->fg1;
+      img->l4 = img->d1 = img->fg2;
+
+      img->lum = 1.0f;
+      img->avg = 0xFFFFFFFF;
+
+      img->dirty = false;
+
+      return;
+   }
+
 	FILETIME ft;
 	GetFileTime(file, NULL, NULL, &ft);
 	CloseHandle(file);
@@ -345,10 +397,11 @@ void SampleImage(std::shared_ptr<Image> img)
 		int w, h, n;
 		uint32_t *imgData = (uint32_t*) stbi_load_from_file(fp, &w, &h, &n, 4);
 
+      fclose(fp);
+
 		if (imgData == nullptr)
 		{
 			RmLog(LOG_ERROR, L"Could not load file!");
-			fseek(fp, 0, SEEK_SET);
 
 			imgData = loadIcon(img->path.c_str(), &w, &h);
 
@@ -370,7 +423,6 @@ void SampleImage(std::shared_ptr<Image> img)
 
 				img->dirty = false;
 
-				fclose(fp);
 				return;
 			}
 
@@ -384,8 +436,6 @@ void SampleImage(std::shared_ptr<Image> img)
 
 			isIcon = true;
 		}
-
-		fclose(fp);
 
 		isIcon |= img->forceIcon;
 
