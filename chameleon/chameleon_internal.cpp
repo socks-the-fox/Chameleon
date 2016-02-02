@@ -54,15 +54,15 @@ float distance(const ColorStat *c1, const ColorStat *c2)
 float contrast(const ColorStat *c1, const ColorStat *c2)
 {
 	// TODO: SIMDize this?
-	float r1 = (c1->r > 0.03928) ? pow((c1->r + 0.055f) / 1.055f, 2.4f) : c1->r / 12.92f;
-	float g1 = (c1->g > 0.03928) ? pow((c1->g + 0.055f) / 1.055f, 2.4f) : c1->g / 12.92f;
-	float b1 = (c1->b > 0.03928) ? pow((c1->b + 0.055f) / 1.055f, 2.4f) : c1->b / 12.92f;
+	float r1 = (c1->r > 0.03928f) ? static_cast<float>(pow((c1->r + 0.055f) / 1.055f, 2.4f)) : c1->r / 12.92f;
+	float g1 = (c1->g > 0.03928f) ? static_cast<float>(pow((c1->g + 0.055f) / 1.055f, 2.4f)) : c1->g / 12.92f;
+	float b1 = (c1->b > 0.03928f) ? static_cast<float>(pow((c1->b + 0.055f) / 1.055f, 2.4f)) : c1->b / 12.92f;
 
 	float L1 = 0.2126f * r1 + 0.7152f * g1 + 0.0722f * b1;
 
-	float r2 = (c2->r > 0.03928) ? pow((c2->r + 0.055f) / 1.055f, 2.4f) : c2->r / 12.92f;
-	float g2 = (c2->g > 0.03928) ? pow((c2->g + 0.055f) / 1.055f, 2.4f) : c2->g / 12.92f;
-	float b2 = (c2->b > 0.03928) ? pow((c2->b + 0.055f) / 1.055f, 2.4f) : c2->b / 12.92f;
+	float r2 = (c2->r > 0.03928f) ? static_cast<float>(pow((c2->r + 0.055f) / 1.055f, 2.4f)) : c2->r / 12.92f;
+	float g2 = (c2->g > 0.03928f) ? static_cast<float>(pow((c2->g + 0.055f) / 1.055f, 2.4f)) : c2->g / 12.92f;
+	float b2 = (c2->b > 0.03928f) ? static_cast<float>(pow((c2->b + 0.055f) / 1.055f, 2.4f)) : c2->b / 12.92f;
 
 	float L2 = 0.2126f * r2 + 0.7152f * g2 + 0.0722f * b2;
 
