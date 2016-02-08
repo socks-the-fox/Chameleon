@@ -1,7 +1,7 @@
 #define INVALID_INDEX UINT16_MAX
 #define MAX_COLOR_STATS 67
 #define LAST_COLOR 0x3F
-#define MIN_CONTRAST 4.0f
+#define MIN_CONTRAST 0.19f
 
 #define FG1_BACKUP_INDEX 64
 #define FG2_BACKUP_INDEX 65
@@ -43,6 +43,8 @@ struct Chameleon
 	ColorStat *colors;
 
 	// Whether or not we've already fixed the RGB values so we don't screw them up
+	float pixelcount;
+	float edgecount;
 	bool rgbFixed;
 };
 
@@ -55,8 +57,8 @@ inline uint16_t XRGB5(uint32_t c)
 	return (r << 4) | (g << 2) | b;
 }
 
-void fixRGB(ColorStat *color);
-void calcYUV(ColorStat *color);
+void fixRGB(ColorStat *color, float pixelcount);
+void calcYUV(ColorStat *color, float edgecount);
 float saturation(const ColorStat *color);
 float distance(const ColorStat *c1, const ColorStat *c2);
 float contrast(const ColorStat *c1, const ColorStat *c2);

@@ -4,21 +4,25 @@
 #include "chameleon.h"
 #include "chameleon_internal.h"
 
-void fixRGB(ColorStat *color)
+void fixRGB(ColorStat *color, float pixelcount)
 {
-	// The _mm_set_ps starts with the 1 (for keeping the count the same) because of the whole little-endian deal
-	color->rgbc = _mm_div_ps(color->rgbc, _mm_set_ps(1, color->count, color->count, color->count));
+	// The _mm_set_ps starts with the pixelcount (for keeping the count the same) because of the whole little-endian deal
+	// Make pixelcount range 0-1
+	color->rgbc = _mm_div_ps(color->rgbc, _mm_set_ps(pixelcount, color->count, color->count, color->count));
 }
 
-void calcYUV(ColorStat *color)
+void calcYUV(ColorStat *color, float edgecount)
 {
 	// From http://www.fourcc.org/fccyvrgb.php
 	// TODO: SIMDize this?
 	color->y = (0.299f * color->r) + (0.587f * color->g) + (0.114f * color->b);
 	color->u = 0.492f * (color->b - color->y);
 	color->v = 0.877f * (color->r - color->y);
+	// Make edgecount range 0-1
+	color->edgeCount /= edgecount;
 }
 
+// Range 0-1
 float saturation(const ColorStat *color)
 {
 	if (color->r == 0 && color->g == 0 && color->b == 0)
@@ -40,6 +44,7 @@ float saturation(const ColorStat *color)
 	return result;
 }
 
+// Range 0-1
 float distance(const ColorStat *c1, const ColorStat *c2)
 {
 	// Don't bother with sqrt-ing because we only care that A *is* further from B, but not by how much.
@@ -48,9 +53,10 @@ float distance(const ColorStat *c1, const ColorStat *c2)
 	xyz = _mm_mul_ps(xyz, xyz);
 
 	// Horizontal add would be nice here...
-	return xyz.m128_f32[0] + xyz.m128_f32[1] + xyz.m128_f32[2] + xyz.m128_f32[3];
+	return (xyz.m128_f32[0] + xyz.m128_f32[1] + xyz.m128_f32[2] + xyz.m128_f32[3]) / 3.0f;
 }
 
+// Range 0-1
 float contrast(const ColorStat *c1, const ColorStat *c2)
 {
 	// TODO: SIMDize this?
@@ -68,8 +74,8 @@ float contrast(const ColorStat *c1, const ColorStat *c2)
 
 	if (L1 > L2)
 	{
-		return (L1 + 0.05f) / (L2 + 0.05f);
+		return ((L1 + 0.05f) / (L2 + 0.05f)) / 21.0f;
 	}
 
-	return (L2 + 0.05f) / (L1 + 0.05f);
+	return ((L2 + 0.05f) / (L1 + 0.05f)) / 21.0f;
 }

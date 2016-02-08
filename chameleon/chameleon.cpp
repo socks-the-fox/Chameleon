@@ -21,6 +21,8 @@ Chameleon* createChameleon()
 	
 	memset(result->colors, 0, MAX_COLOR_STATS * sizeof(ColorStat));
 
+	result->pixelcount = 1;
+	result->edgecount = 1;
 	result->rgbFixed = false;
 
 	return result;
@@ -69,7 +71,15 @@ void chameleonProcessLine(Chameleon *chameleon, const uint32_t *lineData, size_t
 		{
 			stat[XRGB5(lineData[lineWidth - 1])].edgeCount++;
 		}
+
+		chameleon->edgecount += 2;
 	}
+	else
+	{
+		chameleon->edgecount += lineWidth;
+	}
+
+	chameleon->pixelcount += lineWidth;
 }
 
 void chameleonProcessImage(Chameleon *chameleon, const uint32_t *imgData, size_t imgWidth, size_t imgHeight, bool resample, bool alpha)
@@ -149,13 +159,13 @@ void chameleonFindKeyColors(Chameleon *chameleon, const ChameleonParams *params,
 		{
 			if (stat[i].count)
 			{
-				fixRGB(&stat[i]);
-				calcYUV(&stat[i]);
+				fixRGB(&stat[i], chameleon->pixelcount);
+				calcYUV(&stat[i], chameleon->edgecount);
 			}
 		}
 
-		fixRGB(&stat[AVG_INDEX]);
-		calcYUV(&stat[AVG_INDEX]);
+		fixRGB(&stat[AVG_INDEX], chameleon->pixelcount);
+		calcYUV(&stat[AVG_INDEX], chameleon->edgecount);
 
 		chameleon->rgbFixed = true;
 	}
@@ -172,7 +182,7 @@ void chameleonFindKeyColors(Chameleon *chameleon, const ChameleonParams *params,
 	const ChameleonParams *bg2Param = &params[2];
 	const ChameleonParams *fg2Param = &params[3];
 
-	float result = 1, temp = 0;
+	float result = 0, temp = 0;
 
 	for (uint16_t i = 0; i < LAST_COLOR + 1; ++i)
 	{
@@ -191,7 +201,7 @@ void chameleonFindKeyColors(Chameleon *chameleon, const ChameleonParams *params,
 	}
 
 	// Now the foreground color...
-	result = 1;
+	result = 0;
 	for (uint16_t i = 0; i < LAST_COLOR + 1; ++i)
 	{
 		if (i != bg1 && stat[i].count > 0)
@@ -202,7 +212,7 @@ void chameleonFindKeyColors(Chameleon *chameleon, const ChameleonParams *params,
 			temp += saturation(&stat[i]) * fg1Param->saturationWeight;
 			temp += contrast(&stat[i], &stat[bg1]) * fg1Param->contrastWeight;
 
-			if (temp >= result)
+			if (temp > result)
 			{
 				fg1 = i;
 				result = temp;
@@ -211,7 +221,7 @@ void chameleonFindKeyColors(Chameleon *chameleon, const ChameleonParams *params,
 	}
 
 	// Second background...
-	result = 1;
+	result = 0;
 	for (uint16_t i = 0; i < LAST_COLOR + 1; ++i)
 	{
 		if (i != bg1 && i != fg1 && stat[i].edgeCount > 0)
@@ -223,7 +233,7 @@ void chameleonFindKeyColors(Chameleon *chameleon, const ChameleonParams *params,
 			temp += saturation(&stat[i]) * bg2Param->saturationWeight;
 			temp += contrast(&stat[i], &stat[fg1]) * bg2Param->contrastWeight;
 
-			if (temp >= result)
+			if (temp > result)
 			{
 				bg2 = i;
 				result = temp;
@@ -232,7 +242,7 @@ void chameleonFindKeyColors(Chameleon *chameleon, const ChameleonParams *params,
 	}
 
 	// Second foreground...
-	result = 1;
+	result = 0;
 	for (uint16_t i = 0; i < LAST_COLOR + 1; ++i)
 	{
 		if (i != bg1 && i != fg1 && i != bg2 && stat[i].count > 0)
@@ -244,7 +254,7 @@ void chameleonFindKeyColors(Chameleon *chameleon, const ChameleonParams *params,
 			temp += saturation(&stat[i]) * fg2Param->saturationWeight;
 			temp += contrast(&stat[i], &stat[bg1]) * fg2Param->contrastWeight;
 
-			if (temp >= result)
+			if (temp > result)
 			{
 				fg2 = i;
 				result = temp;
@@ -288,7 +298,7 @@ void chameleonFindKeyColors(Chameleon *chameleon, const ChameleonParams *params,
 				loops++;
 			}
 
-			calcYUV(&stat[FG1_BACKUP_INDEX]);
+			calcYUV(&stat[FG1_BACKUP_INDEX], 1);
 		}
 
 		cont = contrast(&stat[fg2], &stat[bg1]);
@@ -312,7 +322,7 @@ void chameleonFindKeyColors(Chameleon *chameleon, const ChameleonParams *params,
 				loops++;
 			}
 
-			calcYUV(&stat[FG2_BACKUP_INDEX]);
+			calcYUV(&stat[FG2_BACKUP_INDEX], 1);
 		}
 	}
 
@@ -389,42 +399,42 @@ const ChameleonParams defaultImageParams[4] =
 {
 	// BG1
 	{
-		0.5f, // countWeight
-		100.0f, // edgeWeight
-		0.0f, // bg1distanceWeight
-		0.0f, // fg1distanceWeight
-		0.0f, // saturationWeight
-		0.0f  // contrastWeight
+		0.300f, // countWeight
+		1.000f, // edgeWeight
+		0.000f, // bg1distanceWeight
+		0.000f, // fg1distanceWeight
+		0.000f, // saturationWeight
+		0.000f  // contrastWeight
 	},
 
 	// FG1
 	{
-		0.188f,
-		-10.0f,
-		78.0f,
-		0.0f,
-		190.0f,
-		10.0f
+		 0.234f,
+		-0.400f,
+		 0.568f,
+		 0.000f,
+		 0.327f,
+		 0.303f
 	},
 
 	// BG2
 	{
-		0.75f,
-		2.0f,
-		-4469.0f,
-		100.0f,
-		0.0f,
-		10.0f
+		 1.000f,
+		 0.619f,
+		-0.830f,
+		 0.500f,
+		 0.000f,
+		 0.000f
 	},
 
 	// FG2
 	{
-		0.042f,
-		-1.0f,
-		24.0f,
-		100.0f,
-		146.0f,
-		8.0f
+		 0.400f,
+		 0.000f,
+		 0.304f,
+		 0.050f,
+		 0.136f,
+		 0.107f
 	}
 };
 
