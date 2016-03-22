@@ -1,7 +1,7 @@
 #define INVALID_INDEX UINT16_MAX
 #define MAX_COLOR_STATS 67
 #define LAST_COLOR 0x3F
-#define MIN_CONTRAST 0.19f
+#define MIN_CONTRAST (3.5f / 21.0f)
 
 #define FG1_BACKUP_INDEX 64
 #define FG2_BACKUP_INDEX 65
