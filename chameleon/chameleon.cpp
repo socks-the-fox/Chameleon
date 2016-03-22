@@ -91,20 +91,20 @@ void chameleonProcessImage(Chameleon *chameleon, const uint32_t *imgData, size_t
 		// TODO: Convert to use floats to better space the samples
 		size_t newWidth = 0, newHeight = 0;
 		size_t widthStep = 1, heightStep = 1;
-		if (imgWidth > 128)
+		if (imgWidth > 256)
 		{
-			newWidth = 128;
-			widthStep = imgWidth / 127;
+			newWidth = 256;
+			widthStep = imgWidth / 255;
 		}
 		else
 		{
 			newWidth = imgWidth;
 		}
 		
-		if (imgHeight > 128)
+		if (imgHeight > 256)
 		{
-			newHeight = 128;
-			heightStep = imgHeight / 127;
+			newHeight = 256;
+			heightStep = imgHeight / 255;
 		}
 		else
 		{
