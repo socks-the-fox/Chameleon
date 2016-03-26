@@ -46,6 +46,7 @@ MainFrame::MainFrame() : wxFrame(nullptr, wxID_ANY, "Chameleon Test App")
 	imgPanel->SetBackgroundStyle(wxBG_STYLE_PAINT);
 	imgPanel->Bind(wxEVT_PAINT, &MainFrame::onPaint, this);
 	imgPanel->Bind(wxEVT_SIZE, &MainFrame::onResize, this);
+	imgPanel->Bind(wxEVT_MOTION, &MainFrame::onMouseMove, this);
 	imgSizer->Add(imgPanel, wxSizerFlags(1).Expand().FixedMinSize());
 
 	wxBoxSizer *colorSizer = new wxBoxSizer(wxVERTICAL);
@@ -69,6 +70,16 @@ MainFrame::MainFrame() : wxFrame(nullptr, wxID_ANY, "Chameleon Test App")
 	imgSizer->Add(colorSizer, wxSizerFlags(0).Expand().FixedMinSize());
 
 	mainSizer->Add(imgSizer, wxSizerFlags(1).Expand().FixedMinSize());
+
+	wxPanel *dataPanel = new wxPanel(this);
+	wxBoxSizer *dataSizer = new wxBoxSizer(wxHORIZONTAL);
+
+	colorData = new wxStaticText(dataPanel, wxID_ANY, "p(-) e(-) b(-) f(-) s(-) c(-) t(-)");
+	dataSizer->Add(colorData, wxSizerFlags(1).Border(wxALL, 4).Expand().FixedMinSize());
+
+	dataPanel->SetSizerAndFit(dataSizer);
+
+	mainSizer->Add(dataPanel, wxSizerFlags(0).Expand().FixedMinSize());
 
 	wxPanel *choicePanel = new wxPanel(this);
 	wxBoxSizer *choiceSizer = new wxBoxSizer(wxHORIZONTAL);
@@ -262,7 +273,9 @@ void MainFrame::onPaint(wxPaintEvent &e)
 		w *= scale;
 		h *= scale;
 
-		dc.DrawBitmap(img->ResampleBicubic(w, h), wxPoint((csize.width - w) / 2, (csize.height - h) / 2));
+		resizedImg = img->ResampleBicubic(w, h);
+
+		dc.DrawBitmap(resizedImg, wxPoint((csize.width - w) / 2, (csize.height - h) / 2));
 	}
 }
 
@@ -270,6 +283,70 @@ void MainFrame::onResize(wxSizeEvent &e)
 {
 	imgPanel->Refresh();
 	imgPanel->Update();
+}
+
+void MainFrame::onMouseMove(wxMouseEvent &e)
+{
+	// Draw the image if there is one
+	if (img != nullptr)
+	{
+		size_t w = img->GetWidth();
+		size_t h = img->GetHeight();
+
+		wxRect csize = imgPanel->GetClientRect();
+
+		float scalew = (float)csize.width / w;
+		float scaleh = (float)csize.height / h;
+		float scale = (scalew > scaleh) ? scaleh : scalew;
+
+		w *= scale;
+		h *= scale;
+
+		wxRect imgRect(wxPoint((csize.width - w) / 2, (csize.height - h) / 2), wxSize(w, h));
+
+		if (imgRect.Contains(wxPoint(e.GetX(), e.GetY())))
+		{
+			size_t x = e.GetX() - ((csize.width - w) / 2);
+			size_t y = e.GetY() - ((csize.height - h) / 2);
+
+			uint16_t index = XRGB5(resizedImg.GetRed(x, y) | (resizedImg.GetGreen(x, y) << 8) | (resizedImg.GetBlue(x, y) << 16));
+
+			ColorStat *stat = &chameleon->colors[index];
+
+			float p, e, b, f, s, c, t;
+			p = stat->count * editParams.countWeight;
+			e = stat->edgeCount * editParams.edgeWeight;
+			b = distance(stat, &chameleon->colors[chameleon->colorIndex[CHAMELEON_BACKGROUND1]]) * editParams.bg1distanceWeight;
+			f = distance(stat, &chameleon->colors[chameleon->colorIndex[CHAMELEON_FOREGROUND1]]) * editParams.fg1distanceWeight;
+			s = saturation(stat) * editParams.saturationWeight;
+			c = contrast(stat, &chameleon->colors[chameleon->colorIndex[CHAMELEON_BACKGROUND1]]) * editParams.contrastWeight;
+
+			t = p + e + b + f + s + c;
+
+			wxString str = "p(" + wxString::FromDouble(p) + ")";
+			str += " e(" + wxString::FromDouble(e) + ")";
+			str += " b(" + wxString::FromDouble(b) + ")";
+			str += " f(" + wxString::FromDouble(f) + ")";
+			str += " s(" + wxString::FromDouble(s) + ")";
+			str += " c(" + wxString::FromDouble(c) + ")";
+			str += " t(" + wxString::FromDouble(t) + ")";
+
+			if (index == chameleon->colorIndex[weightChoice->GetSelection()])
+			{
+				str += " *";
+			}
+
+			colorData->SetLabel(str);
+		}
+		else
+		{
+			colorData->SetLabel("p(-) e(-) b(-) f(-) s(-) c(-) t(-)");
+		}
+	}
+	else
+	{
+		colorData->SetLabel("p(-) e(-) b(-) f(-) s(-) c(-) t(-)");
+	}
 }
 
 void MainFrame::onWeightChoiceChanged(wxCommandEvent &e)
@@ -340,7 +417,7 @@ void MainFrame::updateChameleon()
 		return;
 	}
 
-	chameleonFindKeyColors(chameleon, chamParams);
+	chameleonFindKeyColors(chameleon, chamParams, false);
 
 	cp1->SetBackgroundColour(wxColor(chameleonGetColor(chameleon, CHAMELEON_BACKGROUND1)));
 	cp1->Refresh();

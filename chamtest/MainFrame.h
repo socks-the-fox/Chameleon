@@ -15,6 +15,7 @@ class MainFrame : public wxFrame
 	wxTextCtrl *output;
 
 	wxImage *img;
+	wxImage resizedImg;
 
 	Chameleon *chameleon;
 	ChameleonParams chamParams[4];
@@ -27,11 +28,14 @@ class MainFrame : public wxFrame
 	wxTextCtrl *saturationWeight;
 	wxTextCtrl *contrastWeight;
 
+	wxStaticText *colorData;
+
 	void onFileQuit(wxCommandEvent &e);
 	void onFileOpen(wxCommandEvent &e);
 
 	void onPaint(wxPaintEvent &e);
 	void onResize(wxSizeEvent &e);
+	void onMouseMove(wxMouseEvent &e);
 
 	void onWeightChoiceChanged(wxCommandEvent &e);
 	void onWeightChanged(wxCommandEvent &e);
