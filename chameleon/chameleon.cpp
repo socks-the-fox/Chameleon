@@ -462,12 +462,12 @@ const ChameleonParams defaultImageParams[4] =
 
 	// FG2
 	{
-		 0.400f,
-		 0.000f,
-		 0.304f,
-		 0.050f,
-		 0.136f,
-		 0.107f
+		 0.700f,
+		-0.100f,
+		 0.410f,
+		 0.396f,
+		 0.134f,
+		 0.112f
 	}
 };
 
