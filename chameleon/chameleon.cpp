@@ -276,53 +276,86 @@ void chameleonFindKeyColors(Chameleon *chameleon, const ChameleonParams *params,
 	{
 		// Find the contrast between the background and the foreground
 		float cont = contrast(&stat[fg1], &stat[bg1]);
-		// prevent infinite loops;
-		size_t loops;
+		float factor = (cont / MIN_CONTRAST);
+
+		if (stat[0].count == 0)
+		{
+			stat[0].rgbc = _mm_set_ps(0, 0, 0, 0);
+		}
+
+		if (stat[LAST_COLOR].count == 0)
+		{
+			stat[LAST_COLOR].rgbc = _mm_set_ps(0, 1, 1, 1);
+		}
+
 		if (cont < MIN_CONTRAST)
 		{
 			stat[FG1_BACKUP_INDEX] = stat[fg1];
 			fg1 = FG1_BACKUP_INDEX;
-			loops = 0;
-			while (cont < MIN_CONTRAST && loops < 8)
+
+			if (stat[bg1].y > 0.5f)
+			{
+				stat[fg1].rgbc = _mm_mul_ps(stat[fg1].rgbc, _mm_set_ps(1, factor, factor, factor));
+			}
+			else
+			{
+				stat[fg1].rgbc = _mm_div_ps(stat[fg1].rgbc, _mm_set_ps(1, factor, factor, factor));
+				stat[fg1].rgbc = _mm_min_ps(stat[fg1].rgbc, _mm_set_ps(1, 1, 1, 1));
+			}
+
+			cont = contrast(&stat[fg1], &stat[bg1]);
+			if (cont < MIN_CONTRAST)
 			{
 				if (stat[bg1].y > 0.5f)
 				{
-					stat[fg1].rgbc = _mm_div_ps(stat[fg1].rgbc, _mm_set_ps(1, 2, 2, 2));
+					fg1 = 0;
 				}
 				else
 				{
-					stat[fg1].rgbc = _mm_div_ps(_mm_add_ps(stat[fg1].rgbc, _mm_set_ps(0, 1, 1, 1)), _mm_set_ps(1, 2, 2, 2));
+					fg1 = LAST_COLOR;
 				}
-
-				cont = contrast(&stat[fg1], &stat[bg1]);
-				loops++;
 			}
 
 			calcYUV(&stat[FG1_BACKUP_INDEX], 1);
 		}
 
 		cont = contrast(&stat[fg2], &stat[bg1]);
+		factor = (cont / MIN_CONTRAST);
+
 		if (cont < MIN_CONTRAST)
 		{
 			stat[FG2_BACKUP_INDEX] = stat[fg2];
 			fg2 = FG2_BACKUP_INDEX;
-			loops = 0;
-			while (cont < MIN_CONTRAST && loops < 8)
+
+			if (stat[bg1].y > 0.5f)
+			{
+				stat[fg2].rgbc = _mm_mul_ps(stat[fg2].rgbc, _mm_set_ps(1, factor, factor, factor));
+			}
+			else
+			{
+				stat[fg2].rgbc = _mm_div_ps(stat[fg2].rgbc, _mm_set_ps(1, factor, factor, factor));
+				stat[fg2].rgbc = _mm_min_ps(stat[fg2].rgbc, _mm_set_ps(1, 1, 1, 1));
+			}
+
+			cont = contrast(&stat[fg2], &stat[bg1]);
+			if (cont < MIN_CONTRAST)
 			{
 				if (stat[bg1].y > 0.5f)
 				{
-					stat[fg2].rgbc = _mm_div_ps(stat[fg2].rgbc, _mm_set_ps(1, 2, 2, 2));
+					fg2 = 0;
 				}
 				else
 				{
-					stat[fg2].rgbc = _mm_div_ps(_mm_add_ps(stat[fg2].rgbc, _mm_set_ps(0, 1, 1, 1)), _mm_set_ps(1, 2, 2, 2));
+					fg2 = LAST_COLOR;
 				}
-
-				cont = contrast(&stat[fg2], &stat[bg1]);
-				loops++;
 			}
 
 			calcYUV(&stat[FG2_BACKUP_INDEX], 1);
+		}
+
+		if (contrast(&stat[fg1], &stat[bg2]) < MIN_CONTRAST || contrast(&stat[fg2], &stat[bg2]) < MIN_CONTRAST)
+		{
+			bg2 = bg1;
 		}
 	}
 
