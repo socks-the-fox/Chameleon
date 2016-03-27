@@ -316,7 +316,14 @@ void MainFrame::onMouseMove(wxMouseEvent &e)
 			float p, e, b, f, s, c, t;
 			p = stat->count * editParams.countWeight;
 			e = stat->edgeCount * editParams.edgeWeight;
-			b = distance(stat, &chameleon->colors[chameleon->colorIndex[CHAMELEON_BACKGROUND1]]) * editParams.bg1distanceWeight;
+			if (weightChoice->GetSelection() == CHAMELEON_BACKGROUND1)
+			{
+				b = distance(stat, &chameleon->colors[chameleon->colorIndex[CHAMELEON_AVERAGE]]) * editParams.bg1distanceWeight;
+			}
+			else
+			{
+				b = distance(stat, &chameleon->colors[chameleon->colorIndex[CHAMELEON_BACKGROUND1]]) * editParams.bg1distanceWeight;
+			}
 			f = distance(stat, &chameleon->colors[chameleon->colorIndex[CHAMELEON_FOREGROUND1]]) * editParams.fg1distanceWeight;
 			s = saturation(stat) * editParams.saturationWeight;
 			c = contrast(stat, &chameleon->colors[chameleon->colorIndex[CHAMELEON_BACKGROUND1]]) * editParams.contrastWeight;
@@ -417,7 +424,7 @@ void MainFrame::updateChameleon()
 		return;
 	}
 
-	chameleonFindKeyColors(chameleon, chamParams, false);
+	chameleonFindKeyColors(chameleon, chamParams, true);
 
 	cp1->SetBackgroundColour(wxColor(chameleonGetColor(chameleon, CHAMELEON_BACKGROUND1)));
 	cp1->Refresh();
