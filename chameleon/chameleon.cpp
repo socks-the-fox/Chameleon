@@ -190,6 +190,7 @@ void chameleonFindKeyColors(Chameleon *chameleon, const ChameleonParams *params,
 		{
 			temp = stat[i].count * bg1Param->countWeight;
 			temp += stat[i].edgeCount * bg1Param->edgeWeight;
+			temp += distance(&stat[i], &stat[AVG_INDEX]) * bg1Param->bg1distanceWeight;
 			temp += saturation(&stat[i]) * bg1Param->saturationWeight;
 
 			if (temp > result)
@@ -353,7 +354,7 @@ void chameleonFindKeyColors(Chameleon *chameleon, const ChameleonParams *params,
 			calcYUV(&stat[FG2_BACKUP_INDEX], 1);
 		}
 
-		if (contrast(&stat[fg1], &stat[bg2]) < MIN_CONTRAST || contrast(&stat[fg2], &stat[bg2]) < MIN_CONTRAST)
+		if (contrast(&stat[fg1], &stat[bg2]) < (MIN_CONTRAST / 1.3) || contrast(&stat[fg2], &stat[bg2]) < (MIN_CONTRAST / 1.3))
 		{
 			bg2 = bg1;
 		}
@@ -432,22 +433,22 @@ const ChameleonParams defaultImageParams[4] =
 {
 	// BG1
 	{
-		0.300f, // countWeight
-		1.000f, // edgeWeight
-		0.000f, // bg1distanceWeight
-		0.000f, // fg1distanceWeight
-		0.000f, // saturationWeight
-		0.000f  // contrastWeight
+		 0.300f, // countWeight
+		 1.000f, // edgeWeight
+		-1.000f, // bg1distanceWeight
+		 0.000f, // fg1distanceWeight
+		 0.000f, // saturationWeight
+		 0.000f  // contrastWeight
 	},
 
 	// FG1
 	{
 		 0.234f,
-		-0.400f,
+		-0.500f,
 		 0.568f,
 		 0.000f,
-		 0.327f,
-		 0.303f
+		 0.260f,
+		 0.450f
 	},
 
 	// BG2
