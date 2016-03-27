@@ -1,5 +1,9 @@
 Hello, and thank you for showing your interest in Chameleon!
 
+If you like this plugin, please consider
+[donating via PayPal](https://www.paypal.me/socksthefox)
+to help fund further features!
+
 This is a simple plugin that will sample colors from an image
 allowing your skins to seamlessly blend in with the user's
 wallpapers with minimal setup!
