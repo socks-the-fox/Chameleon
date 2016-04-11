@@ -67,24 +67,26 @@
   </ImportGroup>
   <PropertyGroup Label="UserMacros" />
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">
-    <IncludePath>..\..\rainmeter\API;..\chameleon;$(IncludePath)</IncludePath>
+    <IncludePath>..\..\rainmeter\API;..\..\libchameleon\libchameleon;$(IncludePath)</IncludePath>
     <TargetName>Chameleon</TargetName>
-    <LibraryPath>..\Debug;..\..\rainmeter\API\x32;$(LibraryPath)</LibraryPath>
+    <LibraryPath>..\..\libchameleon\x86\Debug Static;..\..\rainmeter\API\x32;$(LibraryPath)</LibraryPath>
+    <OutDir>$(SolutionDir)$(PlatformShortName)\$(Configuration)\</OutDir>
   </PropertyGroup>
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">
-    <IncludePath>..\..\rainmeter\API;..\chameleon;$(IncludePath)</IncludePath>
+    <IncludePath>..\..\rainmeter\API;..\..\libchameleon\libchameleon;$(IncludePath)</IncludePath>
     <TargetName>Chameleon</TargetName>
-    <LibraryPath>..\..\rainmeter\API\x32;..\Release;$(LibraryPath)</LibraryPath>
+    <LibraryPath>..\..\rainmeter\API\x32;..\..\libchameleon\x86\Release Static;$(LibraryPath)</LibraryPath>
     <OutDir>$(SolutionDir)\ExampleSkin\Socks\@Resources\Plugin\$(PlatformShortName)\</OutDir>
   </PropertyGroup>
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">
-    <IncludePath>..\..\rainmeter\API;..\chameleon;$(IncludePath)</IncludePath>
-    <LibraryPath>..\x64\Debug;..\..\rainmeter\API\x64;$(LibraryPath)</LibraryPath>
+    <IncludePath>..\..\rainmeter\API;..\..\libchameleon\libchameleon;$(IncludePath)</IncludePath>
+    <LibraryPath>..\..\libchameleon\x64\Debug Static;..\..\rainmeter\API\x64;$(LibraryPath)</LibraryPath>
     <TargetName>Chameleon</TargetName>
+    <OutDir>$(SolutionDir)$(PlatformShortName)\$(Configuration)\</OutDir>
   </PropertyGroup>
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Release|x64'">
-    <IncludePath>..\..\rainmeter\API;..\chameleon;$(IncludePath)</IncludePath>
-    <LibraryPath>..\x64\Release;..\..\rainmeter\API\x64;$(LibraryPath)</LibraryPath>
+    <IncludePath>..\..\rainmeter\API;..\..\libchameleon\libchameleon;$(IncludePath)</IncludePath>
+    <LibraryPath>..\..\libchameleon\x64\Release Static;..\..\rainmeter\API\x64;$(LibraryPath)</LibraryPath>
     <TargetName>Chameleon</TargetName>
     <OutDir>$(SolutionDir)\ExampleSkin\Socks\@Resources\Plugin\$(PlatformShortName)\</OutDir>
   </PropertyGroup>
@@ -93,11 +95,12 @@
       <WarningLevel>Level3</WarningLevel>
       <Optimization>Disabled</Optimization>
       <SDLCheck>true</SDLCheck>
+      <RuntimeLibrary>MultiThreadedDebug</RuntimeLibrary>
     </ClCompile>
     <Link>
       <GenerateDebugInformation>true</GenerateDebugInformation>
-      <ImportLibrary>$(OutDir)rainmeterplugin.lib</ImportLibrary>
-      <AdditionalDependencies>chameleon.lib;rainmeter.lib;%(AdditionalDependencies)</AdditionalDependencies>
+      <ImportLibrary>$(SolutionDir)$(PlatformShortName)\$(Configuration)\$(TargetName).lib</ImportLibrary>
+      <AdditionalDependencies>libchameleon.lib;rainmeter.lib;%(AdditionalDependencies)</AdditionalDependencies>
     </Link>
   </ItemDefinitionGroup>
   <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">
@@ -105,11 +108,12 @@
       <WarningLevel>Level3</WarningLevel>
       <Optimization>Disabled</Optimization>
       <SDLCheck>true</SDLCheck>
+      <RuntimeLibrary>MultiThreadedDebug</RuntimeLibrary>
     </ClCompile>
     <Link>
       <GenerateDebugInformation>true</GenerateDebugInformation>
-      <AdditionalDependencies>chameleon.lib;Rainmeter.lib;%(AdditionalDependencies)</AdditionalDependencies>
-      <ImportLibrary>$(OutDir)rainmeterplugin.lib</ImportLibrary>
+      <AdditionalDependencies>libchameleon.lib;Rainmeter.lib;%(AdditionalDependencies)</AdditionalDependencies>
+      <ImportLibrary>$(SolutionDir)$(PlatformShortName)\$(Configuration)\$(TargetName).lib</ImportLibrary>
     </Link>
     <PostBuildEvent />
   </ItemDefinitionGroup>
@@ -120,14 +124,15 @@
       <FunctionLevelLinking>true</FunctionLevelLinking>
       <IntrinsicFunctions>true</IntrinsicFunctions>
       <SDLCheck>true</SDLCheck>
+      <RuntimeLibrary>MultiThreaded</RuntimeLibrary>
     </ClCompile>
     <Link>
       <GenerateDebugInformation>false</GenerateDebugInformation>
       <EnableCOMDATFolding>true</EnableCOMDATFolding>
       <OptimizeReferences>true</OptimizeReferences>
-      <ImportLibrary>$(SolutionDir)$(Configuration)\rainmeterplugin.lib</ImportLibrary>
-      <AdditionalDependencies>chameleon.lib;rainmeter.lib;%(AdditionalDependencies)</AdditionalDependencies>
+      <AdditionalDependencies>libchameleon.lib;rainmeter.lib;%(AdditionalDependencies)</AdditionalDependencies>
       <LinkTimeCodeGeneration>UseLinkTimeCodeGeneration</LinkTimeCodeGeneration>
+      <ImportLibrary>$(SolutionDir)$(PlatformShortName)\$(Configuration)\$(TargetName).lib</ImportLibrary>
     </Link>
   </ItemDefinitionGroup>
   <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Release|x64'">
@@ -137,13 +142,14 @@
       <FunctionLevelLinking>true</FunctionLevelLinking>
       <IntrinsicFunctions>true</IntrinsicFunctions>
       <SDLCheck>true</SDLCheck>
+      <RuntimeLibrary>MultiThreaded</RuntimeLibrary>
     </ClCompile>
     <Link>
       <GenerateDebugInformation>false</GenerateDebugInformation>
       <EnableCOMDATFolding>true</EnableCOMDATFolding>
       <OptimizeReferences>true</OptimizeReferences>
-      <AdditionalDependencies>chameleon.lib;Rainmeter.lib;%(AdditionalDependencies)</AdditionalDependencies>
-      <ImportLibrary>$(SolutionDir)$(Platform)\$(Configuration)\rainmeterplugin.lib</ImportLibrary>
+      <AdditionalDependencies>libchameleon.lib;Rainmeter.lib;%(AdditionalDependencies)</AdditionalDependencies>
+      <ImportLibrary>$(SolutionDir)$(PlatformShortName)\$(Configuration)\$(TargetName).lib</ImportLibrary>
       <LinkTimeCodeGeneration>UseLinkTimeCodeGeneration</LinkTimeCodeGeneration>
     </Link>
   </ItemDefinitionGroup>
