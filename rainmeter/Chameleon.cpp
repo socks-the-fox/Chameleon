@@ -19,6 +19,10 @@
 #define STBI__X86_TARGET
 #include "stb_image.h"
 
+#define STB_IMAGE_RESIZE_IMPLEMENTATION
+#define STBIR_SATURATE_INT
+#include "stb_image_resize.h"
+
 enum MeasureType
 {
 	MEASURE_CONTAINER,
@@ -380,7 +384,7 @@ void SampleImage(std::shared_ptr<Image> img)
 		int w, h, n;
 		uint32_t *imgData = (uint32_t*) stbi_load_from_file(fp, &w, &h, &n, 4);
 
-      fclose(fp);
+		fclose(fp);
 
 		if (imgData == nullptr)
 		{
@@ -391,7 +395,7 @@ void SampleImage(std::shared_ptr<Image> img)
 			if (imgData == nullptr)
 			{
 				// It's something we don't actually know how to handle, so let's not.
-            useDefaultColors(img);
+				useDefaultColors(img);
 
 				img->dirty = false;
 
@@ -400,7 +404,8 @@ void SampleImage(std::shared_ptr<Image> img)
 
 			// RGB swap image data?
 			uint32_t temp = 0;
-			for (size_t i = 0; i < w * h; ++i)
+			size_t area = w * h;
+			for (size_t i = 0; i < area; ++i)
 			{
 				temp = imgData[i];
 				imgData[i] = (temp & 0xFF000000) | ((temp & 0x00FF0000) >> 16) | (temp & 0x0000FF00) | ((temp & 0x000000FF) << 16);
@@ -411,10 +416,28 @@ void SampleImage(std::shared_ptr<Image> img)
 
 		isIcon |= img->forceIcon;
 
+		// TODO: Crop image as requested
+
+		// Resize image for Chameleon
+		if (w > 256 || h > 256)
+		{
+			int newWidth = (w < 256 ? w : 256);
+			int newHeight = (h < 256 ? h : 256);
+			uint32_t *resizedData = static_cast<uint32_t*>(stbi__malloc(newWidth * newHeight * sizeof(uint32_t)));
+
+			stbir_resize_uint8_generic(reinterpret_cast<unsigned char*>(imgData), w, h, 0, reinterpret_cast<unsigned char*>(resizedData), newWidth, newHeight, 0, 4, -1, 0, STBIR_EDGE_CLAMP, STBIR_FILTER_BOX, STBIR_COLORSPACE_LINEAR, NULL);
+
+			stbi_image_free(imgData);
+
+			imgData = resizedData;
+			w = newWidth;
+			h = newHeight;
+		}
+
 		// Run through Chameleon
 		Chameleon *chameleon = createChameleon();
 
-		chameleonProcessImage(chameleon, imgData, w, h, true, isIcon);
+		chameleonProcessImage(chameleon, imgData, w, h, isIcon);
 
 		if (isIcon)
 		{
