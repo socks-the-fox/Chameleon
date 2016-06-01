@@ -57,8 +57,10 @@ struct Image
 	ImageType type;
 	std::wstring path;
 	FILETIME lastMod;
+	RECT cropRect;
 	bool dirty;
 	bool forceIcon;
+	bool customCrop;
 
 	uint32_t bg1;
 	uint32_t bg2;
@@ -232,26 +234,56 @@ inline void useDefaultColors(std::shared_ptr<Image> img)
    img->avg = 0xFFFFFFFF;
 }
 
+uint32_t* cropImage(uint32_t *imgData, int oldW, int oldH, const RECT *cropRect)
+{
+	if (cropRect->left == 0 && cropRect->right >= oldW && cropRect->top == 0 && cropRect->bottom >= oldH)
+	{
+		return imgData;
+	}
+
+	if (cropRect->left > oldW || cropRect->top > oldH)
+	{
+		RmLog(LOG_ERROR, L"Cropping out of bounds of image! Check your parameters.");
+		return imgData;
+	}
+
+	int newW, newH;
+	newW = (cropRect->right <= oldW ? cropRect->right : oldW) - cropRect->left;
+	newH = (cropRect->bottom <= oldH ? cropRect->bottom : oldH) - cropRect->top;
+
+	uint32_t *result = (uint32_t*)stbi__malloc(newW * newH * sizeof(uint32_t));
+
+	for (int i = 0; i < newH; ++i)
+	{
+		memcpy(&result[i * newW], &imgData[cropRect->left + ((i + cropRect->top) * oldW)], newW * sizeof(uint32_t));
+	}
+
+	stbi_image_free(imgData);
+	return result;
+}
+
 void SampleImage(std::shared_ptr<Image> img)
 {
 	bool isIcon = false;
+	RECT monitorRect;
 
 	// If we're sampling the desktop, grab that
 	if (img->type == IMG_DESKTOP)
 	{
 		std::wstring path = L"";
+
+		// First, get the info we need from the old API
+
+		HMONITOR mon = MonitorFromWindow(img->hWnd, MONITOR_DEFAULTTONEAREST);
+		MONITORINFO monInf;
+		monInf.cbSize = sizeof(MONITORINFO);
+		GetMonitorInfo(mon, &monInf);
+
 		if (IsWindows8OrGreater())
 		{
 			// Use the multi-desktop fun version!
 
-			// First, get the info we need from the old API
-
-			HMONITOR mon = MonitorFromWindow(img->hWnd, MONITOR_DEFAULTTONEAREST);
-			MONITORINFO monInf;
-			monInf.cbSize = sizeof(MONITORINFO);
-			GetMonitorInfo(mon, &monInf);
-
-			// Now set up the new API
+			// Set up the new API
 
 			LPWSTR monPath;
 			LPWSTR wallPath;
@@ -260,15 +292,15 @@ void SampleImage(std::shared_ptr<Image> img)
 			IDesktopWallpaper *wp = nullptr;
 
 			CoCreateInstance(__uuidof(DesktopWallpaper), NULL, CLSCTX_ALL, IID_PPV_ARGS(&wp));
-         if (wp == nullptr)
-         {
-            // We couldn't get the wallpaper info. Just use the fallback colors
-            useDefaultColors(img);
+			if (wp == nullptr)
+			{
+				// We couldn't get the wallpaper info. Just use the fallback colors
+				useDefaultColors(img);
 
-            img->dirty = false;
+				img->dirty = false;
 
-            return;
-         }
+				return;
+			}
 
 			// Count the monitors
 			UINT monCount = 0;
@@ -306,14 +338,14 @@ void SampleImage(std::shared_ptr<Image> img)
 			WCHAR wallPath[MAX_PATH + 1];
 			ZeroMemory((void*)wallPath, sizeof(WCHAR) * (MAX_PATH + 1));
 
-         if (SystemParametersInfoW(SPI_GETDESKWALLPAPER, MAX_PATH, (void*)wallPath, 0))
-         {
-            path = wallPath;
-         }
-         else
-         {
-            path = L"";
-         }
+			if (SystemParametersInfoW(SPI_GETDESKWALLPAPER, MAX_PATH, (void*)wallPath, 0))
+			{
+				path = wallPath;
+			}
+			else
+			{
+				path = L"";
+			}
 		}
 
 		// First, is the current path the same as the new path
@@ -323,6 +355,12 @@ void SampleImage(std::shared_ptr<Image> img)
 			img->path = path;
 			img->dirty = true;
 		}
+
+		// Prepare cropping info
+		monitorRect.left = 0;
+		monitorRect.top = 0;
+		monitorRect.right = monInf.rcMonitor.right - monInf.rcMonitor.left;
+		monitorRect.bottom = monInf.rcMonitor.bottom - monInf.rcMonitor.top;
 	}
 
 	// Let's check the path
@@ -338,19 +376,19 @@ void SampleImage(std::shared_ptr<Image> img)
 
 	// Now the "file modified" time
 	HANDLE file = CreateFileW(img->path.c_str(), 0, FILE_SHARE_DELETE | FILE_SHARE_WRITE | FILE_SHARE_READ, NULL, OPEN_EXISTING, 0, NULL);
-   if (file == INVALID_HANDLE_VALUE)
-   {
-      // Couldn't get the last accessed time for the file.
-      std::wstring debug = L"Chameleon: Could not get handle on ";
-      debug += img->path;
-      RmLog(LOG_ERROR, debug.c_str());
+	if (file == INVALID_HANDLE_VALUE)
+	{
+		// Couldn't get the last accessed time for the file.
+		std::wstring debug = L"Chameleon: Could not get handle on ";
+		debug += img->path;
+		RmLog(LOG_ERROR, debug.c_str());
 
-      useDefaultColors(img);
+		useDefaultColors(img);
 
-      img->dirty = false;
+		img->dirty = false;
 
-      return;
-   }
+		return;
+	}
 
 	FILETIME ft;
 	GetFileTime(file, NULL, NULL, &ft);
@@ -416,7 +454,31 @@ void SampleImage(std::shared_ptr<Image> img)
 
 		isIcon |= img->forceIcon;
 
-		// TODO: Crop image as requested
+		//  Crop image as requested
+		if (img->customCrop)
+		{
+			imgData = cropImage(imgData, w, h, &img->cropRect);
+		}
+		else if (img->type == IMG_DESKTOP)
+		{
+			RECT cropRect;
+			cropRect.left = (w - monitorRect.right) / 2;
+			if(cropRect.left < 0)
+			{
+				cropRect.left = 0;
+			}
+
+			cropRect.top = (h - monitorRect.bottom) / 2;
+			if (cropRect.top < 0)
+			{
+				cropRect.top = 0;
+			}
+
+			cropRect.right = monitorRect.right + cropRect.left;
+			cropRect.bottom = monitorRect.bottom + cropRect.top;
+
+			imgData = cropImage(imgData, w, h, &cropRect);
+		}
 
 		// Resize image for Chameleon
 		if (w > 256 || h > 256)
@@ -522,6 +584,10 @@ PLUGIN_EXPORT void Reload(void *data, void *rm, double *maxVal)
 
 			img->bg1 = img->bg2 = img->fg1 = img->fg2 = 0x000000FF;
 
+			img->cropRect.left = img->cropRect.top = 0;
+			img->cropRect.right = img->cropRect.bottom = LONG_MAX;
+			img->customCrop = false;
+
 			// We'll need to reload the color data...
 			img->dirty = true;
 
@@ -595,6 +661,8 @@ PLUGIN_EXPORT void Reload(void *data, void *rm, double *maxVal)
 		{
 			img->fallback_fg2 = (std::stoi(fallbackColorStr, 0, 16) << 8) | 0xFF;
 		}
+
+
 
 		Update(data);
 	}
