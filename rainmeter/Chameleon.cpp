@@ -584,8 +584,6 @@ PLUGIN_EXPORT void Reload(void *data, void *rm, double *maxVal)
 
 			img->bg1 = img->bg2 = img->fg1 = img->fg2 = 0x000000FF;
 
-			img->cropRect.left = img->cropRect.top = 0;
-			img->cropRect.right = img->cropRect.bottom = LONG_MAX;
 			img->customCrop = false;
 
 			// We'll need to reload the color data...
@@ -600,6 +598,15 @@ PLUGIN_EXPORT void Reload(void *data, void *rm, double *maxVal)
 		{
 			img->type = IMG_DESKTOP;
 			img->forceIcon = false;
+
+			std::wstring desktopCrop = RmReadString(rm, L"CropDesktop", L"1");
+
+			// Define a "custom" crop of max-size to prevent the default
+			// "crop to monitor size" behavior but only use it if
+			// CropDesktop is anything other than 0
+			img->cropRect.left = img->cropRect.top = 0;
+			img->cropRect.right = img->cropRect.bottom = LONG_MAX;
+			img->customCrop = desktopCrop.compare(L"0") == 0;
 		}
 		else if (type.compare(L"File") == 0)
 		{
@@ -662,7 +669,14 @@ PLUGIN_EXPORT void Reload(void *data, void *rm, double *maxVal)
 			img->fallback_fg2 = (std::stoi(fallbackColorStr, 0, 16) << 8) | 0xFF;
 		}
 
+		// Grab cropping info
+		img->cropRect.left = RmReadInt(rm, L"CropX", 0);
+		img->cropRect.top = RmReadInt(rm, L"CropY", 0);
+		img->cropRect.right = RmReadInt(rm, L"CropW", 16777215) + img->cropRect.left;
+		img->cropRect.right = RmReadInt(rm, L"CropH", 16777215) + img->cropRect.top;
 
+		// Use the cropping info if it's not the defaults
+		img->customCrop = !(img->cropRect.left == 0 && img->cropRect.top == 0 && img->cropRect.right == 16777215 && img->cropRect.bottom == 16777215);
 
 		Update(data);
 	}
