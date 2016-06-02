@@ -234,29 +234,32 @@ inline void useDefaultColors(std::shared_ptr<Image> img)
    img->avg = 0xFFFFFFFF;
 }
 
-uint32_t* cropImage(uint32_t *imgData, int oldW, int oldH, const RECT *cropRect)
+uint32_t* cropImage(uint32_t *imgData, int *oldW, int *oldH, const RECT *cropRect)
 {
-	if (cropRect->left == 0 && cropRect->right >= oldW && cropRect->top == 0 && cropRect->bottom >= oldH)
+	if (cropRect->left == 0 && cropRect->right >= *oldW && cropRect->top == 0 && cropRect->bottom >= *oldH)
 	{
 		return imgData;
 	}
 
-	if (cropRect->left > oldW || cropRect->top > oldH)
+	if (cropRect->left > *oldW || cropRect->top > *oldH)
 	{
 		RmLog(LOG_ERROR, L"Cropping out of bounds of image! Check your parameters.");
 		return imgData;
 	}
 
 	int newW, newH;
-	newW = (cropRect->right <= oldW ? cropRect->right : oldW) - cropRect->left;
-	newH = (cropRect->bottom <= oldH ? cropRect->bottom : oldH) - cropRect->top;
+	newW = (cropRect->right <= *oldW ? cropRect->right : *oldW) - cropRect->left;
+	newH = (cropRect->bottom <= *oldH ? cropRect->bottom : *oldH) - cropRect->top;
 
 	uint32_t *result = (uint32_t*)stbi__malloc(newW * newH * sizeof(uint32_t));
 
 	for (int i = 0; i < newH; ++i)
 	{
-		memcpy(&result[i * newW], &imgData[cropRect->left + ((i + cropRect->top) * oldW)], newW * sizeof(uint32_t));
+		memcpy(&result[i * newW], &imgData[cropRect->left + ((i + cropRect->top) * (*oldW))], newW * sizeof(uint32_t));
 	}
+
+	*oldW = newW;
+	*oldH = newH;
 
 	stbi_image_free(imgData);
 	return result;
@@ -457,7 +460,7 @@ void SampleImage(std::shared_ptr<Image> img)
 		//  Crop image as requested
 		if (img->customCrop)
 		{
-			imgData = cropImage(imgData, w, h, &img->cropRect);
+			imgData = cropImage(imgData, &w, &h, &img->cropRect);
 		}
 		else if (img->type == IMG_DESKTOP)
 		{
@@ -477,7 +480,7 @@ void SampleImage(std::shared_ptr<Image> img)
 			cropRect.right = monitorRect.right + cropRect.left;
 			cropRect.bottom = monitorRect.bottom + cropRect.top;
 
-			imgData = cropImage(imgData, w, h, &cropRect);
+			imgData = cropImage(imgData, &w, &h, &cropRect);
 		}
 
 		// Resize image for Chameleon
@@ -673,7 +676,7 @@ PLUGIN_EXPORT void Reload(void *data, void *rm, double *maxVal)
 		img->cropRect.left = RmReadInt(rm, L"CropX", 0);
 		img->cropRect.top = RmReadInt(rm, L"CropY", 0);
 		img->cropRect.right = RmReadInt(rm, L"CropW", 16777215) + img->cropRect.left;
-		img->cropRect.right = RmReadInt(rm, L"CropH", 16777215) + img->cropRect.top;
+		img->cropRect.bottom = RmReadInt(rm, L"CropH", 16777215) + img->cropRect.top;
 
 		// Use the cropping info if it's not the defaults
 		img->customCrop = !(img->cropRect.left == 0 && img->cropRect.top == 0 && img->cropRect.right == 16777215 && img->cropRect.bottom == 16777215);
