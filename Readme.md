@@ -32,12 +32,14 @@ check out the FileView plugin for how to get them from a .exe.
 If you're downloading this from my site, installing Chameleon
 is as simple as installing the example .rmskin. Rainmeter will
 stash everything where it's supposed to go for you. If you're
-grabbing this from GitHub you should be able to compile the
-solution after excluding the test app from the build process.
-If you *do* want to build the test app you'll just need to
-compile the latest build of wxWidgets and update that
-project's directories to point it there. I'm sure if you're
-compiling Chameleon yourself you already know how to install it.
+grabbing this from GitHub you'll also need to grab the libChameleon
+repo and tell Visual Studio where that's built at. From there,
+compilation should be fairly straightforward. Then you just need
+to toss the apropriate architecture's DLL into the Rainmeter
+plugin folder in your AppData's Roaming profile folder.
+
+If you want to build the libChameleon test app you'll need to
+grab it's repo. It only depends on wxWidgets and libChameleon.
 
 Using Chameleon is really simple! You can set it to
 either sample from the desktop or directly from a specific
@@ -62,6 +64,15 @@ You can also optionally tell Chameleon whether you want these
 values as a hex code or a numeric color code by setting the
 `Format` option to `Hex` or `Dec`, respectively.
 
+You might find it useful to only grab colors from a cropped
+region of an image. You can do so with the `CropX`, `CropY`,
+`CropW`, and `CropH` options. These set the position and
+dimension of the rectangle to crop out.
+
+By default, Chameleon will attempt to crop desktop images to
+the visible portion based on the monitor's resolution. You
+can tell Chameleon to not do this by setting `CropDesktop` to 0.
+
 One last optional option is to tell Chameleon what fallback
 colors to use when it just can't sample from an image (such
 as with the NowPlaying measure's album art). Right now this
@@ -78,8 +89,8 @@ tell Chameleon which measure you're getting the colors from,
 and `Color` which tells Chameleon which color you're interested
 in.
 
-The `Light` and `Dark` colors are just the selected foreground and background
-colors sorted by how light or dark they are, respectively.
+The `Light` and `Dark` colors are just the selected foreground and
+background colors sorted by how light or dark they are, respectively.
 
 `Color` can be one of:
 
