@@ -23,6 +23,9 @@
 #define STBIR_SATURATE_INT
 #include "stb_image_resize.h"
 
+// An excessively large value I picked due to being a few orders of magnatude larger than the largest image I've seen (NASA Hubble image)
+#define CROP_MAX_DIMENSION 16777215
+
 enum MeasureType
 {
 	MEASURE_CONTAINER,
@@ -550,6 +553,33 @@ PLUGIN_EXPORT void Initialize(void* *data, void *rm)
 	*data = measure;
 }
 
+bool RmReadBool(void *rm, LPCWSTR option, bool defValue, BOOL replaceMeasures = 1)
+{
+	std::wstring value = RmReadString(rm, option, defValue? L"1" : L"0", replaceMeasures);
+	// Anything that isn't an explicit "false" value should be considered true
+	bool result = true;
+	if (value.empty() || value.compare(L"0") == 0 ||
+		value.compare(L"False") == 0 || value.compare(L"false") == 0 ||
+		value.compare(L"No") == 0 || value.compare(L"no") == 0 ||
+		value.compare(L"F") == 0 || value.compare(L"f") == 0 ||
+		value.compare(L"N") == 0 || value.compare(L"n") == 0)
+		result = false;
+
+	return result;
+}
+
+uint32_t RmReadColor(void *rm, LPCWSTR option, uint32_t defValue, BOOL replaceMeasures = 1)
+{
+	std::wstring value = RmReadString(rm, option, L"", replaceMeasures);
+
+	if (value.empty())
+	{
+		return defValue;
+	}
+	
+	return (std::stoi(value, 0, 16) << 8) | 0xFF;
+}
+
 PLUGIN_EXPORT void Reload(void *data, void *rm, double *maxVal)
 {
 	Measure *measure = static_cast<Measure*>(data);
@@ -558,10 +588,25 @@ PLUGIN_EXPORT void Reload(void *data, void *rm, double *maxVal)
 
 	std::wstring parent = RmReadString(rm, L"Parent", L"");
 
-	std::wstring type = RmReadString(rm, L"Type", L"Desktop");
-
 	if (parent.empty())
 	{
+		std::wstring type = RmReadString(rm, L"Type", L"Desktop");
+		std::wstring path = RmReadPath(rm, L"Path", L"");
+		bool desktopCrop = RmReadBool(rm, L"CropDesktop", true);
+		bool forceIcon = RmReadBool(rm, L"ForceIcon", false);
+
+		uint32_t fallback_bg1 = RmReadColor(rm, L"FallbackBG1", 0xFFFFFFFF);
+		uint32_t fallback_bg2 = RmReadColor(rm, L"FallbackBG2", fallback_bg1);
+		uint32_t fallback_fg1 = RmReadColor(rm, L"FallbackFG1", 0x000000FF);
+		uint32_t fallback_fg2 = RmReadColor(rm, L"FallbackFG2", fallback_fg1);
+
+		int cropX = RmReadInt(rm, L"CropX", 0);
+		int cropY = RmReadInt(rm, L"CropY", 0);
+		int cropW = RmReadInt(rm, L"CropW", CROP_MAX_DIMENSION);
+		int cropH = RmReadInt(rm, L"CropH", CROP_MAX_DIMENSION);
+
+		bool customCrop = !(cropX == 0 && cropY == 0 && cropW == CROP_MAX_DIMENSION && cropH == CROP_MAX_DIMENSION);
+
 		// Does the measure already have a parent?
 		std::shared_ptr<Image> img;
 
@@ -602,27 +647,24 @@ PLUGIN_EXPORT void Reload(void *data, void *rm, double *maxVal)
 			img->type = IMG_DESKTOP;
 			img->forceIcon = false;
 
-			std::wstring desktopCrop = RmReadString(rm, L"CropDesktop", L"1");
-
 			// Define a "custom" crop of max-size to prevent the default
 			// "crop to monitor size" behavior but only use it if
 			// CropDesktop is anything other than 0
 			img->cropRect.left = img->cropRect.top = 0;
 			img->cropRect.right = img->cropRect.bottom = LONG_MAX;
-			img->customCrop = desktopCrop.compare(L"0") == 0;
+			img->customCrop = !desktopCrop;
 		}
 		else if (type.compare(L"File") == 0)
 		{
 			img->type = IMG_FILE;
-			std::wstring path = RmReadPath(rm, L"Path", L"");
+			
 			if (path.compare(img->path) != 0)
 			{
 				img->path = path;
 				img->dirty = true;
 			}
 
-			std::wstring forceIcon = RmReadString(rm, L"ForceIcon", L"0");
-			img->forceIcon = forceIcon.compare(L"0") != 0;
+			img->forceIcon = forceIcon;
 		}
 		else
 		{
@@ -630,56 +672,20 @@ PLUGIN_EXPORT void Reload(void *data, void *rm, double *maxVal)
 			return;
 		}
 
-		std::wstring fallbackColorStr = RmReadString(rm, L"FallbackBG1", L"FFFFFF");
 
-		// If statements are due to the fact that FallbackXXX might be specified but not initialized yet.
-		if (fallbackColorStr.empty())
-		{
-			img->fallback_bg1 = 0xFFFFFFFF;
-		}
-		else
-		{
-			img->fallback_bg1 = (std::stoi(fallbackColorStr, 0, 16) << 8) | 0xFF;
-		}
-
-		fallbackColorStr = RmReadString(rm, L"FallbackBG2", fallbackColorStr.c_str());
-		if (fallbackColorStr.empty())
-		{
-			img->fallback_bg2 = img->fallback_bg1;
-		}
-		else
-		{
-			img->fallback_bg2 = (std::stoi(fallbackColorStr, 0, 16) << 8) | 0xFF;
-		}
-
-		fallbackColorStr = RmReadString(rm, L"FallbackFG1", L"000000");
-		if (fallbackColorStr.empty())
-		{
-			img->fallback_fg1 = 0x000000FF;
-		}
-		else
-		{
-			img->fallback_fg1 = (std::stoi(fallbackColorStr, 0, 16) << 8) | 0xFF;
-		}
-
-		fallbackColorStr = RmReadString(rm, L"FallbackFG2", fallbackColorStr.c_str());
-		if (fallbackColorStr.empty())
-		{
-			img->fallback_fg2 = img->fallback_fg1;
-		}
-		else
-		{
-			img->fallback_fg2 = (std::stoi(fallbackColorStr, 0, 16) << 8) | 0xFF;
-		}
+		img->fallback_bg1 = fallback_bg1;
+		img->fallback_bg2 = fallback_bg2;
+		img->fallback_fg1 = fallback_fg1;
+		img->fallback_fg2 = fallback_fg2;
 
 		// Grab cropping info
-		img->cropRect.left = RmReadInt(rm, L"CropX", 0);
-		img->cropRect.top = RmReadInt(rm, L"CropY", 0);
-		img->cropRect.right = RmReadInt(rm, L"CropW", 16777215) + img->cropRect.left;
-		img->cropRect.bottom = RmReadInt(rm, L"CropH", 16777215) + img->cropRect.top;
+		img->cropRect.left = cropX;
+		img->cropRect.top = cropY;
+		img->cropRect.right = cropW + cropX;
+		img->cropRect.bottom = cropH + cropY;
 
 		// Use the cropping info if it's not the defaults
-		img->customCrop = !(img->cropRect.left == 0 && img->cropRect.top == 0 && img->cropRect.right == 16777215 && img->cropRect.bottom == 16777215);
+		img->customCrop = customCrop;
 
 		Update(data);
 	}
