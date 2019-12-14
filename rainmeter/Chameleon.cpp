@@ -460,7 +460,8 @@ void SampleImage(std::shared_ptr<Image> img)
 		ColorStat spotAverage = { 0 };
 
 		// If we're reading from the desktop, read from Windows, not the file
-		if (img->type == IMG_DESKTOP)
+		// but only if we're not cropping the image manually
+		if (img->type == IMG_DESKTOP && !img->customCrop)
 		{
 			// Get the Real Device Context, then get a non-live copy to read from
 			HDC hdcDesktop = GetDC(GetShellWindow());
@@ -739,7 +740,7 @@ void SampleImage(std::shared_ptr<Image> img)
 
 		img->lum = chameleonGetLuminance(chameleon, CHAMELEON_AVERAGE);
 
-		if (img->contextAware && img->type == IMG_DESKTOP)
+		if (img->type == IMG_DESKTOP && img->contextAware && !img->customCrop)
 		{
 			// Find which value is closest to the average value for the skin
 			ColorStat bg1 = { 0 };
