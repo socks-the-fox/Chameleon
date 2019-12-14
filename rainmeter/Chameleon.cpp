@@ -2,6 +2,8 @@
 #include <memory>
 #include <string>
 
+#include <intrin.h>
+
 #include <Windows.h>
 #include <VersionHelpers.h>
 #include <Shobjidl.h>
@@ -13,8 +15,10 @@
 
 #include <RainmeterAPI.h>
 #include <chameleon.h>
+#include <chameleon_internal.h>
 
 #define STB_IMAGE_IMPLEMENTATION
+#define STBI_MSC_SECURE_CRT
 #define STBI_SSE2
 #define STBI__X86_TARGET
 #include "stb_image.h"
@@ -61,9 +65,14 @@ struct Image
 	std::wstring path;
 	FILETIME lastMod;
 	RECT cropRect;
+	RECT cachedCrop;
+	LONG skinX;
+	LONG skinY;
+	bool draggingSkin;
 	bool dirty;
 	bool forceIcon;
 	bool customCrop;
+	bool contextAware;
 
 	uint32_t bg1;
 	uint32_t bg2;
@@ -237,6 +246,15 @@ inline void useDefaultColors(std::shared_ptr<Image> img)
    img->avg = 0xFFFFFFFF;
 }
 
+void processRGB(uint32_t color, ColorStat *colorStat)
+{
+	__m128 rgbc;
+	rgbc = _mm_set_ps(1.0f, static_cast<float>((color & 0x00FF0000) >> 16), static_cast<float>((color & 0x0000FF00) >> 8), static_cast<float>(color & 0x000000FF));
+	rgbc = _mm_div_ps(rgbc, _mm_set_ps(1, 255.0f, 255.0f, 255.0f));
+
+	colorStat->rgbc = _mm_add_ps(rgbc, colorStat->rgbc);
+}
+
 uint32_t* cropImage(uint32_t *imgData, int *oldW, int *oldH, const RECT *cropRect)
 {
 	if (cropRect->left == 0 && cropRect->right >= *oldW && cropRect->top == 0 && cropRect->bottom >= *oldH)
@@ -264,7 +282,6 @@ uint32_t* cropImage(uint32_t *imgData, int *oldW, int *oldH, const RECT *cropRec
 	*oldW = newW;
 	*oldH = newH;
 
-	stbi_image_free(imgData);
 	return result;
 }
 
@@ -272,6 +289,9 @@ void SampleImage(std::shared_ptr<Image> img)
 {
 	bool isIcon = false;
 	RECT monitorRect;
+	RECT skinRect = { 0 };
+	MONITORINFO monInf;
+	monInf.cbSize = sizeof(MONITORINFO);
 
 	// If we're sampling the desktop, grab that
 	if (img->type == IMG_DESKTOP)
@@ -281,8 +301,6 @@ void SampleImage(std::shared_ptr<Image> img)
 		// First, get the info we need from the old API
 
 		HMONITOR mon = MonitorFromWindow(img->hWnd, MONITOR_DEFAULTTONEAREST);
-		MONITORINFO monInf;
-		monInf.cbSize = sizeof(MONITORINFO);
 		GetMonitorInfo(mon, &monInf);
 
 		if (IsWindows8OrGreater())
@@ -367,13 +385,36 @@ void SampleImage(std::shared_ptr<Image> img)
 		monitorRect.top = 0;
 		monitorRect.right = monInf.rcMonitor.right - monInf.rcMonitor.left;
 		monitorRect.bottom = monInf.rcMonitor.bottom - monInf.rcMonitor.top;
+
+		// Get the actual area the skin is in, relative to the monitor
+		GetWindowRect(img->hWnd, &skinRect);
+
+		// Mark the skin as dragging until there is no movement
+		if (img->skinX != skinRect.left || img->skinY != skinRect.top)
+		{
+			img->skinX = skinRect.left;
+			img->skinY = skinRect.top;
+			img->draggingSkin = true;
+		}
+		else if (img->draggingSkin)
+		{
+			img->draggingSkin = false;
+			img->dirty = true;
+		}
+	}
+
+	// Determine if the skin's cropping area has changed
+	if (img->customCrop && !EqualRect(&img->cropRect, &img->cachedCrop))
+	{
+		img->cachedCrop = img->cropRect;
+		img->dirty = true;
 	}
 
 	// Let's check the path
 	if (img->path.empty())
 	{
 		// Empty path! Let's dump some default values and be done with it...
-      useDefaultColors(img);
+		useDefaultColors(img);
 
 		img->dirty = false;
 
@@ -414,21 +455,198 @@ void SampleImage(std::shared_ptr<Image> img)
 		debug += img->path;
 		RmLog(LOG_DEBUG, debug.c_str());
 
-		// Convert the path
-
-		FILE *fp;
-		
-		if (_wfopen_s(&fp, img->path.c_str(), L"rb") != 0)
-		{
-			// Something goofed, but we can try again
-			return;
-		}
-
-		// Load image data
 		int w, h, n;
-		uint32_t *imgData = (uint32_t*) stbi_load_from_file(fp, &w, &h, &n, 4);
+		uint32_t *imgData = nullptr;
+		ColorStat spotAverage = { 0 };
 
-		fclose(fp);
+		// If we're reading from the desktop, read from Windows, not the file
+		if (img->type == IMG_DESKTOP)
+		{
+			// Get the Real Device Context, then get a non-live copy to read from
+			HDC hdcDesktop = GetDC(GetShellWindow());
+			HDC hdc = CreateCompatibleDC(hdcDesktop);
+
+			// Create the bitmap we're going to bounce the image data into, and the immediately out of
+			// because it's in a device-specific format
+			// (maybe 6-bit, maybe 8-bit, maybe 10-bit, rgb, bgrx, rgbx, who knows!)
+			HBITMAP hBmp = CreateCompatibleBitmap(hdcDesktop, monitorRect.right, monitorRect.bottom);
+
+			// do the actual copy, but save the default hbmp windows set up that we can't exactly use for this
+			// so we can let windows clean that up later
+			HBITMAP hOldBmp = (HBITMAP)SelectObject(hdc, hBmp);
+
+			// TODO: Negative coordinates? (i.e. due to odd monitor arrangements)
+			int xRef = GetSystemMetrics(SM_XVIRTUALSCREEN);
+			int yRef = GetSystemMetrics(SM_YVIRTUALSCREEN);
+
+			BitBlt(hdc, 0, 0, monitorRect.right, monitorRect.bottom, hdcDesktop, monInf.rcMonitor.left - xRef, monInf.rcMonitor.top - yRef, SRCCOPY);
+
+			// Windows doesn't like having the handle selected when we want to read from it,
+			// so now we put the old handle back 
+			SelectObject(hdc, hOldBmp);
+
+			// Now we have the data in a device specific buffer that Windows won't touch while we're using it
+			// so let's convert that to a format we can actually use
+
+			LPBITMAPINFO bmpInfo = (LPBITMAPINFO)malloc(sizeof(BITMAPINFOHEADER) + 256 * sizeof(RGBQUAD));
+			ZeroMemory(&bmpInfo->bmiHeader, sizeof(BITMAPINFOHEADER));
+			bmpInfo->bmiHeader.biSize = sizeof(BITMAPINFOHEADER);
+
+			// Get what Windows wants us to allocate, and do so
+			GetDIBits(hdc, hBmp, 0, monitorRect.bottom, NULL, bmpInfo, DIB_RGB_COLORS);
+			uint8_t *byteData = (uint8_t*)malloc(bmpInfo->bmiHeader.biSizeImage);
+
+			// Now do the actual copy
+			GetDIBits(hdc, hBmp, 0, monitorRect.bottom, byteData, bmpInfo, DIB_RGB_COLORS);
+
+			w = bmpInfo->bmiHeader.biWidth;
+			h = bmpInfo->bmiHeader.biHeight;
+
+			// Windows uses a negative value to specify the bitmap is flipped
+			// but we don't care about the orientation because it doesn't matter
+			if (h < 0)
+				h = -h;
+
+			// We're going to be doing this by bytes so it'll be easier
+			imgData = (uint32_t*)stbi__malloc(4 * w * h);
+			
+			// At this point, we have the color data but probably not in the layout we are expecting...
+			// (i.e. BGRX instead of RGBX)
+			// We need to figure out what it *is* so we can convert it to what we *want*
+			// It should be one of 3 possibilities: 16, 24, or 32-bit
+			// Of those, 16 and 32-bit can be either BI_RGB or BI_BITFIELDS
+			// If they are BI_BITFIELDS we need to use the info in bmpInfo->bmiColors[0,1,2]
+			// to decode where the R, G. and B bits actually are.
+			
+			// For 32-bit this is easy and we can actually basically use the same code path for BI_RGB and BI_BITFIELDS.
+
+			// These are AFTER shifting the data down to LSB
+			uint32_t rMask = 0x000000FF;
+			uint32_t gMask = 0x000000FF;
+			uint32_t bMask = 0x000000FF;
+
+			// These are how much to shift to get to LSB
+			unsigned long rShift = 16;
+			unsigned long gShift =  8;
+			unsigned long bShift =  0;
+			size_t pixelBytes = bmpInfo->bmiHeader.biBitCount / 8;
+
+			// Anything that is BI_RGB follows a standard format, with only 16-bit (2-byte)
+			// images requiring special treatment. HOWEVER anything BI_BITFIELDS has to be
+			// masked and shifted according to what the OS says. It can all be treated the same
+			// by the following code due to how it ends up not caring about details.
+
+			if (bmpInfo->bmiHeader.biCompression == BI_BITFIELDS)
+			{
+				// Could be R5G5B5, X8R8G8B8, R5G6B5, or anything really.
+				// Let's figure it out
+
+				// Get the actual masks. These are shifted, so we'll need to unshift them
+				// (and count by how much for later)
+				rMask = ((uint32_t*)bmpInfo->bmiColors)[0];
+				gMask = ((uint32_t*)bmpInfo->bmiColors)[1];
+				bMask = ((uint32_t*)bmpInfo->bmiColors)[2];
+
+				// Count the least significant zeros (how much to shift the masks)
+				_BitScanForward(&rShift, rMask);
+				_BitScanForward(&gShift, gMask);
+				_BitScanForward(&bShift, bMask);
+
+				rMask >>= rShift;
+				gMask >>= gShift;
+				bMask >>= bShift;
+			}
+			else if (pixelBytes == 2)
+			{
+				// Standard R5G5B5
+
+				rMask = 0x0000001F;
+				gMask = 0x0000001F;
+				bMask = 0x0000001F;
+
+				rShift = 10;
+				gShift =  5;
+				bShift =  0;
+			}
+			
+			uint8_t r, g, b;
+			uint32_t pixel;
+			for (size_t i = 0; i < w * h; ++i)
+			{
+				// Augh...
+				// We want the data of the whole pixel we're at, as a uint32_t
+				// If the data is smaller than 32-bit the extra will automatically
+				// be ignored by the shift and masking we're about to do
+				pixel = *((uint32_t*)&byteData[i * pixelBytes]);
+
+				r = (pixel >> rShift) & rMask;
+				g = (pixel >> gShift) & gMask;
+				b = (pixel >> bShift) & bMask;
+
+				imgData[i] = 0xFF000000 | (b << 16) | (g << 8) | r;
+			}
+			
+			n = 4;
+
+			//stbi_write_png("chamdebug.png", w, h, n, imgData, w*n);
+
+			// Now we need to create an average for the region of the skin
+			int cW = w, cH = h;
+			
+
+			skinRect.left -= monInf.rcMonitor.left;
+			skinRect.right -= monInf.rcMonitor.left;
+			skinRect.top -= monInf.rcMonitor.top;
+			skinRect.bottom -= monInf.rcMonitor.top;
+
+			if (bmpInfo->bmiHeader.biHeight > 0)
+			{
+				// Oh, we're vertically flipped.
+				// Gotta "flip" the rect to match (actually just shifting it)
+				LONG bottom = skinRect.bottom;
+				skinRect.bottom = h - skinRect.top;
+				skinRect.top = h - bottom;
+			}
+			
+			if (img->contextAware)
+			{
+				uint32_t *skinRegion = cropImage(imgData, &cW, &cH, &skinRect);
+
+				for (size_t i = 0; i < cW * cH; ++i)
+				{
+					processRGB(skinRegion[i], &spotAverage);
+				}
+
+				fixRGB(&spotAverage, (float)cW * cH);
+				calcYUV(&spotAverage, 1);
+
+				if (skinRegion != imgData)
+					stbi_image_free(skinRegion);
+			}
+
+			DeleteObject(hBmp);
+			DeleteDC(hdc);
+			ReleaseDC(GetDesktopWindow(), hdcDesktop);
+			free(bmpInfo);
+			free(byteData);
+		}
+		else
+		{
+			// Convert the path
+
+			FILE *fp;
+
+			if (_wfopen_s(&fp, img->path.c_str(), L"rb") != 0)
+			{
+				// Something goofed, but we can try again
+				return;
+			}
+
+			// Load image data
+			imgData = (uint32_t*)stbi_load_from_file(fp, &w, &h, &n, 4);
+
+			fclose(fp);
+		}
 
 		if (imgData == nullptr)
 		{
@@ -463,27 +681,12 @@ void SampleImage(std::shared_ptr<Image> img)
 		//  Crop image as requested
 		if (img->customCrop)
 		{
-			imgData = cropImage(imgData, &w, &h, &img->cropRect);
-		}
-		else if (img->type == IMG_DESKTOP)
-		{
-			RECT cropRect;
-			cropRect.left = (w - monitorRect.right) / 2;
-			if(cropRect.left < 0)
+			uint32_t *croppedData = cropImage(imgData, &w, &h, &img->cropRect);
+			if (croppedData != imgData)
 			{
-				cropRect.left = 0;
+				stbi_image_free(imgData);
+				imgData = croppedData;
 			}
-
-			cropRect.top = (h - monitorRect.bottom) / 2;
-			if (cropRect.top < 0)
-			{
-				cropRect.top = 0;
-			}
-
-			cropRect.right = monitorRect.right + cropRect.left;
-			cropRect.bottom = monitorRect.bottom + cropRect.top;
-
-			imgData = cropImage(imgData, &w, &h, &cropRect);
 		}
 
 		// Resize image for Chameleon
@@ -535,6 +738,58 @@ void SampleImage(std::shared_ptr<Image> img)
 		img->avg = _byteswap_ulong(chameleonGetColor(chameleon, CHAMELEON_AVERAGE)) | 0xFF;
 
 		img->lum = chameleonGetLuminance(chameleon, CHAMELEON_AVERAGE);
+
+		if (img->contextAware && img->type == IMG_DESKTOP)
+		{
+			// Find which value is closest to the average value for the skin
+			ColorStat bg1 = { 0 };
+			ColorStat bg2 = { 0 };
+			ColorStat fg1 = { 0 };
+			ColorStat fg2 = { 0 };
+
+			processRGB(chameleonGetColor(chameleon, CHAMELEON_BACKGROUND1), &bg1);
+			calcYUV(&bg1, 1);
+			processRGB(chameleonGetColor(chameleon, CHAMELEON_BACKGROUND2), &bg2);
+			calcYUV(&bg2, 1);
+			processRGB(chameleonGetColor(chameleon, CHAMELEON_FOREGROUND1), &fg1);
+			calcYUV(&fg1, 1);
+			processRGB(chameleonGetColor(chameleon, CHAMELEON_FOREGROUND2), &fg2);
+			calcYUV(&fg2, 1);
+
+			float bg1Dist = distance(&spotAverage, &bg1);
+			float bg2Dist = distance(&spotAverage, &bg2);
+			float fg1Dist = distance(&spotAverage, &fg1);
+			float fg2Dist = distance(&spotAverage, &fg2);
+
+			uint32_t sbg1 = img->bg1;
+			uint32_t sbg2 = img->bg2;
+			uint32_t sfg1 = img->fg1;
+			uint32_t sfg2 = img->fg2;
+			// Set the background/foreground based on that
+			if ((bg2Dist < bg1Dist) && (bg2Dist < fg1Dist) && (bg2Dist < fg2Dist))
+			{
+				// BG2 is the closest match for the background under the skin, use that instead
+				
+				img->bg1 = sbg2;
+				img->bg2 = sbg1;
+			}
+			else if ((fg1Dist < bg1Dist) && (fg1Dist < fg2Dist))
+			{
+				// FG1 is the closest match, swap the FG and BG
+				img->bg1 = sfg1;
+				img->bg2 = sfg2;
+				img->fg1 = sbg1;
+				img->fg2 = sbg2;
+			}
+			else if (fg2Dist < bg1Dist)
+			{
+				// FG2 is the closest match
+				img->bg1 = sfg2;
+				img->bg2 = sfg1;
+				img->fg1 = sbg1;
+				img->fg2 = sbg2;
+			}
+		}
 
 		destroyChameleon(chameleon);
 		chameleon = nullptr;
@@ -594,6 +849,7 @@ PLUGIN_EXPORT void Reload(void *data, void *rm, double *maxVal)
 		std::wstring path = RmReadPath(rm, L"Path", L"");
 		bool desktopCrop = RmReadBool(rm, L"CropDesktop", true);
 		bool forceIcon = RmReadBool(rm, L"ForceIcon", false);
+		bool contextAware = RmReadBool(rm, L"ContextAwareColors", true);
 
 		uint32_t fallback_bg1 = RmReadColor(rm, L"FallbackBG1", 0xFFFFFFFF);
 		uint32_t fallback_bg2 = RmReadColor(rm, L"FallbackBG2", fallback_bg1);
@@ -634,6 +890,10 @@ PLUGIN_EXPORT void Reload(void *data, void *rm, double *maxVal)
 
 			img->customCrop = false;
 
+			img->skinX = 0;
+			img->skinY = 0;
+			img->draggingSkin = false;
+
 			// We'll need to reload the color data...
 			img->dirty = true;
 
@@ -672,6 +932,9 @@ PLUGIN_EXPORT void Reload(void *data, void *rm, double *maxVal)
 			return;
 		}
 
+		// Shuffle the colors based on the average color
+		// of the area under the skin
+		img->contextAware = contextAware;
 
 		img->fallback_bg1 = fallback_bg1;
 		img->fallback_bg2 = fallback_bg2;
@@ -821,6 +1084,22 @@ PLUGIN_EXPORT double Update(void *data)
 				measure->parent->dirty = true;
 			}
 		}
+
+		int cropX = RmReadInt(measure->parent->rm, L"CropX", 0);
+		int cropY = RmReadInt(measure->parent->rm, L"CropY", 0);
+		int cropW = RmReadInt(measure->parent->rm, L"CropW", CROP_MAX_DIMENSION);
+		int cropH = RmReadInt(measure->parent->rm, L"CropH", CROP_MAX_DIMENSION);
+
+		bool customCrop = !(cropX == 0 && cropY == 0 && cropW == CROP_MAX_DIMENSION && cropH == CROP_MAX_DIMENSION);
+
+		// Grab cropping info
+		measure->parent->cropRect.left = cropX;
+		measure->parent->cropRect.top = cropY;
+		measure->parent->cropRect.right = cropW + cropX;
+		measure->parent->cropRect.bottom = cropH + cropY;
+
+		// Use the cropping info if it's not the defaults
+		measure->parent->customCrop = customCrop;
 
 		SampleImage(measure->parent);
 	}
