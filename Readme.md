@@ -73,6 +73,12 @@ By default, Chameleon will attempt to crop desktop images to
 the visible portion based on the monitor's resolution. You
 can tell Chameleon to not do this by setting `CropDesktop` to 0.
 
+If you are reading a desktop background and are not applying a
+custom cropping, Chameleon will by default try to shuffle the
+colors it selected to better fit with the area the skin is
+covering. You can disable this by setting `ContextAwareColors`
+to 0.
+
 One last optional option is to tell Chameleon what fallback
 colors to use when it just can't sample from an image (such
 as with the NowPlaying measure's album art). Right now this
