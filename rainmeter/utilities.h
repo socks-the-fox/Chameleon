@@ -16,3 +16,11 @@ bool RmReadBool(void *rm, LPCWSTR option, bool defValue, BOOL replaceMeasures = 
 
 // Simple helper to read a hex r,g,b value to a uint32_t RGBA color
 uint32_t RmReadColor(void *rm, LPCWSTR option, uint32_t defValue, BOOL replaceMeasures = 1);
+
+// Load a .ico-formatted icon as a stb_image compatible image
+uint32_t* loadIcon(const wchar_t *path, int *w, int *h);
+
+// Crop a stb_image compatible image to the selected rectangle
+uint32_t* cropImage(uint32_t *imgData, int *oldW, int *oldH, const RECT *cropRect);
+
+uint32_t* createImage(int w, int h);

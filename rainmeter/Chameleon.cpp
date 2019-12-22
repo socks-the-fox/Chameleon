@@ -17,17 +17,8 @@
 #include <chameleon.h>
 #include <chameleon_internal.h>
 
-#define STB_IMAGE_IMPLEMENTATION
-#define STBI_MSC_SECURE_CRT
-#define STBI_SSE2
-#define STBI__X86_TARGET
 #include "stb_image.h"
-
-#define STB_IMAGE_RESIZE_IMPLEMENTATION
-#define STBIR_SATURATE_INT
 #include "stb_image_resize.h"
-
-#define STB_IMAGE_WRITE_IMPLEMENTATION
 #include "stb_image_write.h"
 
 // Some helpful functions
@@ -75,123 +66,6 @@ PLUGIN_EXPORT void Reload(void *data, void *rm, double *maxVal);
 PLUGIN_EXPORT double Update(void *data);
 PLUGIN_EXPORT LPCWSTR GetString(void *data);
 PLUGIN_EXPORT void Finalize(void *data);
-
-_COM_SMARTPTR_TYPEDEF(IImageList, __uuidof(IImageList));
-
-uint32_t* loadIcon(const wchar_t *path, int *w, int *h)
-{
-	// Outputs
-	uint32_t *imgData = nullptr;
-	*w = -1;
-	*h = -1;
-
-	// Internal stuff
-	HICON hIcon = nullptr;
-	ICONINFO icon;
-	IImageListPtr spiml;
-	BITMAPINFO bmi;
-	BITMAP bm;
-	HDC hDC = GetDC(NULL);
-	SHFILEINFOW info = { 0 };
-	int iconSize = SHIL_EXTRALARGE;
-	if (IsWindowsVistaOrGreater())
-	{
-		iconSize = SHIL_JUMBO;
-	}
-
-	// These assume unconditional success.
-	// I'll fix them if they ever report breakage
-	// I was dreading this part until I found out it's
-	// literally three functions.
-	SHGetFileInfoW(path, 0, &info, sizeof(info), SHGFI_SYSICONINDEX);
-	SHGetImageList(iconSize, IID_PPV_ARGS(&spiml));
-	spiml->GetIcon(info.iIcon, ILD_TRANSPARENT, &hIcon);
-
-	// Load icon image data
-	GetIconInfo(hIcon, &icon);
-
-	// I'm not even going to bother with monochrome icons
-	// Though I'm sure most of the time the defaults work anyway...
-	if (icon.hbmColor != 0)
-	{
-		// Lots of roundabout fun to get the data we want
-
-
-		// First, the size
-		GetObject(icon.hbmColor, sizeof(BITMAP), &bm);
-		*w = bm.bmWidth;
-		*h = bm.bmHeight;
-
-		// Now the bits!
-		bmi.bmiHeader.biSize = sizeof(bmi.bmiHeader);
-		bmi.bmiHeader.biWidth = *w;
-		bmi.bmiHeader.biHeight = -(*h);
-		bmi.bmiHeader.biPlanes = 1;
-		bmi.bmiHeader.biBitCount = 32;
-		bmi.bmiHeader.biCompression = BI_RGB;
-		bmi.bmiHeader.biSizeImage = 0;
-		bmi.bmiHeader.biXPelsPerMeter = 0;
-		bmi.bmiHeader.biYPelsPerMeter = 0;
-		bmi.bmiHeader.biClrUsed = 0;
-		bmi.bmiHeader.biClrImportant = 0;
-
-		imgData = (uint32_t*)stbi__malloc((*w) * (*h) * sizeof(uint32_t));
-		if (GetDIBits(hDC, icon.hbmColor, 0, *h, imgData, &bmi, DIB_RGB_COLORS) != *h)
-		{
-			// Error!
-			*w = -1;
-			*h = -1;
-			stbi_image_free(imgData);
-			imgData = nullptr;
-
-			// Fall through to normal cleanup
-		}
-	}
-
-	// Cleanup!
-	ReleaseDC(NULL, hDC);
-
-	if (icon.hbmColor)
-	{
-		DeleteObject(icon.hbmColor);
-	}
-
-	DeleteObject(icon.hbmMask);
-
-	DestroyIcon(info.hIcon);
-
-	return imgData;
-}
-
-uint32_t* cropImage(uint32_t *imgData, int *oldW, int *oldH, const RECT *cropRect)
-{
-	if (cropRect->left == 0 && cropRect->right >= *oldW && cropRect->top == 0 && cropRect->bottom >= *oldH)
-	{
-		return imgData;
-	}
-
-	if (cropRect->left > *oldW || cropRect->top > *oldH)
-	{
-		RmLog(LOG_ERROR, L"Cropping out of bounds of image! Check your parameters.");
-		return imgData;
-	}
-
-	int newW, newH;
-	newW = (cropRect->right <= *oldW ? cropRect->right : *oldW) - cropRect->left;
-	newH = (cropRect->bottom <= *oldH ? cropRect->bottom : *oldH) - cropRect->top;
-
-	uint32_t *result = (uint32_t*)stbi__malloc(newW * newH * sizeof(uint32_t));
-
-	for (int i = 0; i < newH; ++i)
-	{
-		memcpy(&result[i * newW], &imgData[cropRect->left + ((i + cropRect->top) * (*oldW))], newW * sizeof(uint32_t));
-	}
-
-	*oldW = newW;
-	*oldH = newH;
-
-	return result;
-}
 
 void SampleImage(std::shared_ptr<Image> img)
 {
@@ -449,7 +323,7 @@ void SampleImage(std::shared_ptr<Image> img)
 			}
 
 			// We're going to be doing this by bytes so it'll be easier
-			imgData = (uint32_t*)stbi__malloc(4 * w * h);
+			imgData = (uint32_t*) createImage(w, h);
 			
 			// At this point, we have the color data but probably not in the layout we are expecting...
 			// (i.e. BGRX instead of RGBX)
@@ -648,7 +522,7 @@ void SampleImage(std::shared_ptr<Image> img)
 		{
 			int newWidth = (w < 256 ? w : 256);
 			int newHeight = (h < 256 ? h : 256);
-			uint32_t *resizedData = static_cast<uint32_t*>(stbi__malloc(newWidth * newHeight * sizeof(uint32_t)));
+			uint32_t *resizedData = createImage(newWidth, newHeight);
 
 			stbir_resize_uint8_generic(reinterpret_cast<unsigned char*>(imgData), w, h, 0, reinterpret_cast<unsigned char*>(resizedData), newWidth, newHeight, 0, 4, -1, 0, STBIR_EDGE_CLAMP, STBIR_FILTER_BOX, STBIR_COLORSPACE_LINEAR, NULL);
 
