@@ -43,6 +43,7 @@ struct Image
 	bool forceIcon;
 	bool customCrop;
 	bool contextAware;
+	RECT contextRect;
 
 	uint32_t bg1;
 	uint32_t bg2;

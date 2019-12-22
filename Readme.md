@@ -79,6 +79,14 @@ colors it selected to better fit with the area the skin is
 covering. You can disable this by setting `ContextAwareColors`
 to 0.
 
+You can also tell Chameleon what area of the screen you want
+to use for context aware colors by setting the `ContextX`,
+`ContextY`, `ContextW` and `ContextH` values. These values
+are relative to the overall Windows desktop layout, so you may
+need to use negative coordinates to get the right location.
+Rainmeter will tell you the coordinates of a skin in that skin's
+right click menu under "Manage skin" if you want a hint.
+
 One last optional option is to tell Chameleon what fallback
 colors to use when it just can't sample from an image (such
 as with the NowPlaying measure's album art). Right now this

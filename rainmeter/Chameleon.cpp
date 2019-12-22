@@ -75,6 +75,7 @@ void SampleImage(std::shared_ptr<Image> img)
 	RECT actualCropRect = img->cropRect;
 	MONITORINFO monInf;
 	monInf.cbSize = sizeof(MONITORINFO);
+	bool customContext = img->contextRect.left || img->contextRect.right || img->contextRect.top || img->contextRect.bottom;
 
 	// If we're sampling the desktop, grab that
 	if (img->type == IMG_DESKTOP)
@@ -179,7 +180,9 @@ void SampleImage(std::shared_ptr<Image> img)
 			img->skinY = skinRect.top;
 			img->draggingSkin = true;
 		}
-		else if (img->draggingSkin)
+		// Don't update by dragging if we're using a custom context area
+		// or if we're just not using context-aware colors
+		else if (img->contextAware && img->draggingSkin && !customContext)
 		{
 			img->draggingSkin = false;
 			img->dirty = true;
@@ -410,9 +413,14 @@ void SampleImage(std::shared_ptr<Image> img)
 				// Now we need to create an average for the region of the skin
 				int cW = w, cH = h;
 
+				// If we have a custom context rectangle, use that
+				
+				if (customContext)
+					skinRect = img->contextRect;
+
 				// Image should be by the overall desktop for custom cropping
 				// and by monitor for default cropping
-				if (img->customCrop)
+				if (img->customCrop || customContext)
 				{
 					skinRect.left -= xRef;
 					skinRect.right -= xRef;
@@ -902,6 +910,15 @@ PLUGIN_EXPORT double Update(void *data)
 		measure->parent->cropRect.top = cropY;
 		measure->parent->cropRect.right = cropW + cropX;
 		measure->parent->cropRect.bottom = cropH + cropY;
+
+		int contextX = RmReadInt(measure->parent->rm, L"ContextX", 0);
+		int contextY = RmReadInt(measure->parent->rm, L"ContextY", 0);
+		int contextW = RmReadInt(measure->parent->rm, L"ContextW", 0);
+		int contextH = RmReadInt(measure->parent->rm, L"ContextH", 0);
+		measure->parent->contextRect.left = contextX;
+		measure->parent->contextRect.top = contextY;
+		measure->parent->contextRect.right = contextX + contextW;
+		measure->parent->contextRect.bottom = contextY + contextH;
 
 		// Use the cropping info if it's not the defaults
 		measure->parent->customCrop = customCrop;
