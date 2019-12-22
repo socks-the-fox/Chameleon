@@ -27,6 +27,9 @@
 #define STBIR_SATURATE_INT
 #include "stb_image_resize.h"
 
+#define STB_IMAGE_WRITE_IMPLEMENTATION
+#include "stb_image_write.h"
+
 // An excessively large value I picked due to being a few orders of magnatude larger than the largest image I've seen (NASA Hubble image)
 #define CROP_MAX_DIMENSION 16777215
 
@@ -290,6 +293,7 @@ void SampleImage(std::shared_ptr<Image> img)
 	bool isIcon = false;
 	RECT monitorRect;
 	RECT skinRect = { 0 };
+	RECT actualCropRect = img->cropRect;
 	MONITORINFO monInf;
 	monInf.cbSize = sizeof(MONITORINFO);
 
@@ -460,27 +464,52 @@ void SampleImage(std::shared_ptr<Image> img)
 		ColorStat spotAverage = { 0 };
 
 		// If we're reading from the desktop, read from Windows, not the file
-		// but only if we're not cropping the image manually
-		if (img->type == IMG_DESKTOP && !img->customCrop)
+		if (img->type == IMG_DESKTOP)
 		{
 			// Get the Real Device Context, then get a non-live copy to read from
-			HDC hdcDesktop = GetDC(GetShellWindow());
+			HWND hwDesktop = GetShellWindow();
+			HDC hdcDesktop = GetDC(hwDesktop);
 			HDC hdc = CreateCompatibleDC(hdcDesktop);
+
+			// Get the upper left reference point for the virtual screen
+			// which might not be (0,0) due to monitor arrangement
+			int xRef = GetSystemMetrics(SM_XVIRTUALSCREEN);
+			int yRef = GetSystemMetrics(SM_YVIRTUALSCREEN);
+
+			// Set up the default monitor-based cropping
+			int imgW = monitorRect.right;
+			int imgH = monitorRect.bottom;
+
+			// This is meant to shift the virtual screen coords to image space coords.
+			int imgX = monInf.rcMonitor.left - xRef;
+			int imgY = monInf.rcMonitor.top - yRef;
+
+			if (img->customCrop)
+			{
+				// There's a custom cropping rectangle, so we can just grab the whole screen
+				// (the cropping code will handle it automatically later)
+				imgX = 0;
+				imgY = 0;
+				imgW = GetSystemMetrics(SM_CXVIRTUALSCREEN);
+				imgH = GetSystemMetrics(SM_CYVIRTUALSCREEN);
+				
+				// Adjust the cropping rectangle
+				actualCropRect.left -= xRef;
+				actualCropRect.right -= xRef;
+				actualCropRect.top -= yRef;
+				actualCropRect.bottom -= yRef;
+			}
 
 			// Create the bitmap we're going to bounce the image data into, and the immediately out of
 			// because it's in a device-specific format
 			// (maybe 6-bit, maybe 8-bit, maybe 10-bit, rgb, bgrx, rgbx, who knows!)
-			HBITMAP hBmp = CreateCompatibleBitmap(hdcDesktop, monitorRect.right, monitorRect.bottom);
+			HBITMAP hBmp = CreateCompatibleBitmap(hdcDesktop, imgW, imgH);
 
 			// do the actual copy, but save the default hbmp windows set up that we can't exactly use for this
 			// so we can let windows clean that up later
 			HBITMAP hOldBmp = (HBITMAP)SelectObject(hdc, hBmp);
 
-			// TODO: Negative coordinates? (i.e. due to odd monitor arrangements)
-			int xRef = GetSystemMetrics(SM_XVIRTUALSCREEN);
-			int yRef = GetSystemMetrics(SM_YVIRTUALSCREEN);
-
-			BitBlt(hdc, 0, 0, monitorRect.right, monitorRect.bottom, hdcDesktop, monInf.rcMonitor.left - xRef, monInf.rcMonitor.top - yRef, SRCCOPY);
+			BitBlt(hdc, 0, 0, imgW, imgH, hdcDesktop, imgX, imgY, SRCCOPY);
 
 			// Windows doesn't like having the handle selected when we want to read from it,
 			// so now we put the old handle back 
@@ -494,19 +523,25 @@ void SampleImage(std::shared_ptr<Image> img)
 			bmpInfo->bmiHeader.biSize = sizeof(BITMAPINFOHEADER);
 
 			// Get what Windows wants us to allocate, and do so
-			GetDIBits(hdc, hBmp, 0, monitorRect.bottom, NULL, bmpInfo, DIB_RGB_COLORS);
+			GetDIBits(hdc, hBmp, 0, imgH, NULL, bmpInfo, DIB_RGB_COLORS);
 			uint8_t *byteData = (uint8_t*)malloc(bmpInfo->bmiHeader.biSizeImage);
 
 			// Now do the actual copy
-			GetDIBits(hdc, hBmp, 0, monitorRect.bottom, byteData, bmpInfo, DIB_RGB_COLORS);
+			GetDIBits(hdc, hBmp, 0, imgH, byteData, bmpInfo, DIB_RGB_COLORS);
 
 			w = bmpInfo->bmiHeader.biWidth;
 			h = bmpInfo->bmiHeader.biHeight;
 
-			// Windows uses a negative value to specify the bitmap is flipped
-			// but we don't care about the orientation because it doesn't matter
+			// Windows uses a negative value to specify the bitmap is right side up
+			// if it's not, we need to adjust the cropping, if any
 			if (h < 0)
 				h = -h;
+			else if(img->customCrop)
+			{
+				LONG bottom = actualCropRect.bottom;
+				actualCropRect.bottom = imgH - actualCropRect.top;
+				actualCropRect.top = imgH - bottom;
+			}
 
 			// We're going to be doing this by bytes so it'll be easier
 			imgData = (uint32_t*)stbi__malloc(4 * w * h);
@@ -589,29 +624,42 @@ void SampleImage(std::shared_ptr<Image> img)
 			
 			n = 4;
 
-			//stbi_write_png("chamdebug.png", w, h, n, imgData, w*n);
 
-			// Now we need to create an average for the region of the skin
-			int cW = w, cH = h;
-			
-
-			skinRect.left -= monInf.rcMonitor.left;
-			skinRect.right -= monInf.rcMonitor.left;
-			skinRect.top -= monInf.rcMonitor.top;
-			skinRect.bottom -= monInf.rcMonitor.top;
-
-			if (bmpInfo->bmiHeader.biHeight > 0)
-			{
-				// Oh, we're vertically flipped.
-				// Gotta "flip" the rect to match (actually just shifting it)
-				LONG bottom = skinRect.bottom;
-				skinRect.bottom = h - skinRect.top;
-				skinRect.top = h - bottom;
-			}
 			
 			if (img->contextAware)
 			{
+				// Now we need to create an average for the region of the skin
+				int cW = w, cH = h;
+
+				// Image should be by the overall desktop for custom cropping
+				// and by monitor for default cropping
+				if (img->customCrop)
+				{
+					skinRect.left -= xRef;
+					skinRect.right -= xRef;
+					skinRect.top -= yRef;
+					skinRect.bottom -= yRef;
+				}
+				else
+				{
+					skinRect.left -= monInf.rcMonitor.left;
+					skinRect.right -= monInf.rcMonitor.left;
+					skinRect.top -= monInf.rcMonitor.top;
+					skinRect.bottom -= monInf.rcMonitor.top;
+				}
+
+				if (bmpInfo->bmiHeader.biHeight > 0)
+				{
+					// Oh, we're vertically flipped.
+					// Gotta "flip" the rect to match (actually just shifting it)
+					LONG bottom = skinRect.bottom;
+					skinRect.bottom = h - skinRect.top;
+					skinRect.top = h - bottom;
+				}
+
 				uint32_t *skinRegion = cropImage(imgData, &cW, &cH, &skinRect);
+
+				//stbi_write_png("chamtest.png", cW, cH, 4, skinRegion, cW * sizeof(uint32_t));
 
 				for (size_t i = 0; i < cW * cH; ++i)
 				{
@@ -627,7 +675,7 @@ void SampleImage(std::shared_ptr<Image> img)
 
 			DeleteObject(hBmp);
 			DeleteDC(hdc);
-			ReleaseDC(GetDesktopWindow(), hdcDesktop);
+			ReleaseDC(hwDesktop, hdcDesktop);
 			free(bmpInfo);
 			free(byteData);
 		}
@@ -682,7 +730,7 @@ void SampleImage(std::shared_ptr<Image> img)
 		//  Crop image as requested
 		if (img->customCrop)
 		{
-			uint32_t *croppedData = cropImage(imgData, &w, &h, &img->cropRect);
+			uint32_t *croppedData = cropImage(imgData, &w, &h, &actualCropRect);
 			if (croppedData != imgData)
 			{
 				stbi_image_free(imgData);
@@ -740,7 +788,7 @@ void SampleImage(std::shared_ptr<Image> img)
 
 		img->lum = chameleonGetLuminance(chameleon, CHAMELEON_AVERAGE);
 
-		if (img->type == IMG_DESKTOP && img->contextAware && !img->customCrop)
+		if (img->type == IMG_DESKTOP && img->contextAware)
 		{
 			// Find which value is closest to the average value for the skin
 			ColorStat bg1 = { 0 };

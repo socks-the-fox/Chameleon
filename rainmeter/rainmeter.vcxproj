@@ -157,8 +157,10 @@
     <ClCompile Include="Chameleon.cpp" />
   </ItemGroup>
   <ItemGroup>
+    <ClInclude Include="resource.h" />
     <ClInclude Include="stb_image.h" />
     <ClInclude Include="stb_image_resize.h" />
+    <ClInclude Include="stb_image_write.h" />
   </ItemGroup>
   <ItemGroup>
     <ResourceCompile Include="Resources.rc" />
