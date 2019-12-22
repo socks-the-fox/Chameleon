@@ -30,84 +30,14 @@
 #define STB_IMAGE_WRITE_IMPLEMENTATION
 #include "stb_image_write.h"
 
+// Some helpful functions
+#include "utilities.h"
+
+// Definitions for the actual measure state
+#include "Measure.h"
+
 // An excessively large value I picked due to being a few orders of magnatude larger than the largest image I've seen (NASA Hubble image)
 #define CROP_MAX_DIMENSION 16777215
-
-enum MeasureType
-{
-	MEASURE_CONTAINER,
-	MEASURE_BG1,
-	MEASURE_BG2,
-	MEASURE_FG1,
-	MEASURE_FG2,
-	MEASURE_AVG_LUM,
-	MEASURE_AVG_COLOR,
-	MEASURE_L1,
-	MEASURE_L2,
-	MEASURE_L3,
-	MEASURE_L4,
-	MEASURE_D1,
-	MEASURE_D2,
-	MEASURE_D3,
-	MEASURE_D4
-};
-
-enum ImageType
-{
-	IMG_DESKTOP,
-	IMG_FILE
-};
-
-struct Image
-{
-	void *rm;
-	void *skin;
-	HWND hWnd;
-	std::wstring name;
-	ImageType type;
-	std::wstring path;
-	FILETIME lastMod;
-	RECT cropRect;
-	RECT cachedCrop;
-	LONG skinX;
-	LONG skinY;
-	bool draggingSkin;
-	bool dirty;
-	bool forceIcon;
-	bool customCrop;
-	bool contextAware;
-
-	uint32_t bg1;
-	uint32_t bg2;
-	uint32_t fg1;
-	uint32_t fg2;
-
-	uint32_t l1;
-	uint32_t l2;
-	uint32_t l3;
-	uint32_t l4;
-
-	uint32_t d1;
-	uint32_t d2;
-	uint32_t d3;
-	uint32_t d4;
-
-	uint32_t fallback_bg1;
-	uint32_t fallback_bg2;
-	uint32_t fallback_fg1;
-	uint32_t fallback_fg2;
-
-	float lum;
-	uint32_t avg;
-};
-
-struct Measure
-{
-	MeasureType type;
-	std::shared_ptr<Image> parent;
-	bool useHex;
-	std::wstring value;
-};
 
 /*
 [ChameleonDesktop]
@@ -137,6 +67,7 @@ Color=Background1
 
 std::vector< std::weak_ptr<Image> > images;
 static const WCHAR whex[] = L"0123456789ABCDEF";
+static const WCHAR invalidErr[] = L"Invalid measure";
 
 void SampleImage(std::shared_ptr<Image> img);
 PLUGIN_EXPORT void Initialize(void* *data, void *rm);
@@ -230,32 +161,6 @@ uint32_t* loadIcon(const wchar_t *path, int *w, int *h)
 	DestroyIcon(info.hIcon);
 
 	return imgData;
-}
-
-inline void useDefaultColors(std::shared_ptr<Image> img)
-{
-   img->bg1 = img->fallback_bg1;
-   img->bg2 = img->fallback_bg2;
-   img->fg1 = img->fallback_fg1;
-   img->fg2 = img->fallback_fg2;
-
-   // TODO: Actually find the brightness of these to sort it properly:
-   img->l1 = img->d4 = img->bg1;
-   img->l2 = img->d3 = img->bg2;
-   img->l3 = img->d2 = img->fg1;
-   img->l4 = img->d1 = img->fg2;
-
-   img->lum = 1.0f;
-   img->avg = 0xFFFFFFFF;
-}
-
-void processRGB(uint32_t color, ColorStat *colorStat)
-{
-	__m128 rgbc;
-	rgbc = _mm_set_ps(1.0f, static_cast<float>((color & 0x00FF0000) >> 16), static_cast<float>((color & 0x0000FF00) >> 8), static_cast<float>(color & 0x000000FF));
-	rgbc = _mm_div_ps(rgbc, _mm_set_ps(1, 255.0f, 255.0f, 255.0f));
-
-	colorStat->rgbc = _mm_add_ps(rgbc, colorStat->rgbc);
 }
 
 uint32_t* cropImage(uint32_t *imgData, int *oldW, int *oldH, const RECT *cropRect)
@@ -849,6 +754,7 @@ void SampleImage(std::shared_ptr<Image> img)
 	}
 }
 
+// Prepares the measure for Rainmeter to use
 PLUGIN_EXPORT void Initialize(void* *data, void *rm)
 {
 	Measure* measure = new Measure;
@@ -857,33 +763,7 @@ PLUGIN_EXPORT void Initialize(void* *data, void *rm)
 	*data = measure;
 }
 
-bool RmReadBool(void *rm, LPCWSTR option, bool defValue, BOOL replaceMeasures = 1)
-{
-	std::wstring value = RmReadString(rm, option, defValue? L"1" : L"0", replaceMeasures);
-	// Anything that isn't an explicit "false" value should be considered true
-	bool result = true;
-	if (value.empty() || value.compare(L"0") == 0 ||
-		value.compare(L"False") == 0 || value.compare(L"false") == 0 ||
-		value.compare(L"No") == 0 || value.compare(L"no") == 0 ||
-		value.compare(L"F") == 0 || value.compare(L"f") == 0 ||
-		value.compare(L"N") == 0 || value.compare(L"n") == 0)
-		result = false;
-
-	return result;
-}
-
-uint32_t RmReadColor(void *rm, LPCWSTR option, uint32_t defValue, BOOL replaceMeasures = 1)
-{
-	std::wstring value = RmReadString(rm, option, L"", replaceMeasures);
-
-	if (value.empty())
-	{
-		return defValue;
-	}
-	
-	return (std::stoi(value, 0, 16) << 8) | 0xFF;
-}
-
+// Sets the initial state for the measure
 PLUGIN_EXPORT void Reload(void *data, void *rm, double *maxVal)
 {
 	Measure *measure = static_cast<Measure*>(data);
@@ -1115,6 +995,8 @@ PLUGIN_EXPORT void Reload(void *data, void *rm, double *maxVal)
 	}
 }
 
+// Called periodically to refresh the values passed to and returned from the measure
+// Dynamic variables should be re-read here.
 PLUGIN_EXPORT double Update(void *data)
 {
 	Measure *measure = static_cast<Measure*>(data);
@@ -1229,8 +1111,7 @@ PLUGIN_EXPORT double Update(void *data)
 	return 0;
 }
 
-static const WCHAR invalidErr[] = L"Invalid measure";
-
+// Reading the value of a measure as a c-string
 PLUGIN_EXPORT LPCWSTR GetString(void *data)
 {
 	Measure *measure = static_cast<Measure*>(data);
@@ -1255,6 +1136,7 @@ PLUGIN_EXPORT LPCWSTR GetString(void *data)
 	}
 }
 
+// When we're removing a measure we don't need anymore
 PLUGIN_EXPORT void Finalize(void *data)
 {
 	Measure *measure = static_cast<Measure*>(data);
