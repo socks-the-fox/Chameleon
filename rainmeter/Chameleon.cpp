@@ -444,6 +444,12 @@ void SampleImage(std::shared_ptr<Image> img)
 					skinRect.top = h - bottom;
 				}
 
+				// Make sure I'm not doing a dumb by sampling negative values
+				if (skinRect.left < 0)
+					skinRect.left = 0;
+				if (skinRect.top < 0)
+					skinRect.top = 0;
+
 				uint32_t *skinRegion = cropImage(imgData, &cW, &cH, &skinRect);
 
 				//stbi_write_png("chamtest.png", cW, cH, 4, skinRegion, cW * sizeof(uint32_t));
