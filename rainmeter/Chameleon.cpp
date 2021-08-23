@@ -531,6 +531,18 @@ void SampleImage(std::shared_ptr<Image> img)
 			}
 		}
 
+		// Quick Sanity Check
+		if (w <= 0 || h <= 0)
+		{
+			RmLog(LOG_ERROR, L"Chameleon: Width or height is less than or equal to zero!");
+
+			useDefaultColors(img);
+
+			img->dirty = false;
+
+			return;
+		}
+
 		// Resize image for Chameleon
 		if (w > 256 || h > 256)
 		{
