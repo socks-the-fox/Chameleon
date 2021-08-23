@@ -534,9 +534,12 @@ void SampleImage(std::shared_ptr<Image> img)
 		// Quick Sanity Check
 		if (w <= 0 || h <= 0)
 		{
-			RmLog(LOG_ERROR, L"Chameleon: Width or height is less than or equal to zero!");
-
-			useDefaultColors(img);
+			// I debated having a crop size of 0 being an error, but some skins might
+			// need to set it to that as a kind of "don't do anything" or maybe through a
+			// procedural generation of the crop bounds so we'll just skip doing anything.
+			
+//			RmLog(LOG_ERROR, L"Chameleon: Width or height is less than or equal to zero!");
+//			useDefaultColors(img);
 
 			img->dirty = false;
 
@@ -769,6 +772,12 @@ PLUGIN_EXPORT void Reload(void *data, void *rm, double *maxVal)
 		img->fallback_bg2 = fallback_bg2;
 		img->fallback_fg1 = fallback_fg1;
 		img->fallback_fg2 = fallback_fg2;
+
+		// Make sure the initial colors are the fallback
+		img->bg1 = fallback_bg1;
+		img->bg2 = fallback_bg2;
+		img->fg1 = fallback_fg1;
+		img->fg2 = fallback_fg2;
 
 		// Grab cropping info
 		img->cropRect.left = cropX;
