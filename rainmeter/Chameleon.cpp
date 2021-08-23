@@ -492,7 +492,7 @@ void SampleImage(std::shared_ptr<Image> img)
 
 		if (imgData == nullptr)
 		{
-			RmLog(LOG_ERROR, L"Could not load file!");
+			RmLog(LOG_ERROR, L"Chameleon: Could not load file!");
 
 			imgData = loadIcon(img->path.c_str(), &w, &h);
 
