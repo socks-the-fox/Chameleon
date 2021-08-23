@@ -180,7 +180,7 @@ uint32_t* cropImage(uint32_t *imgData, int *oldW, int *oldH, const RECT *cropRec
 
 	if (cropRect->left > *oldW || cropRect->top > *oldH)
 	{
-		RmLog(LOG_ERROR, L"Cropping out of bounds of image! Check your parameters.");
+		RmLog(LOG_ERROR, L"Chameleon: Cropping out of bounds of image! Check your parameters.");
 		return imgData;
 	}
 
