@@ -67,6 +67,8 @@ PLUGIN_EXPORT double Update(void *data);
 PLUGIN_EXPORT LPCWSTR GetString(void *data);
 PLUGIN_EXPORT void Finalize(void *data);
 
+bool IsWindows11_24H2OrGreater();
+
 void SampleImage(std::shared_ptr<Image> img)
 {
 	bool isIcon = false;
@@ -246,10 +248,12 @@ void SampleImage(std::shared_ptr<Image> img)
 		ColorStat spotAverage = { 0 };
 
 		// If we're reading from the desktop, read from Windows, not the file
-		if (img->type == IMG_DESKTOP)
+		// Unless we're in Win11 24H2 because MS did something stupid and broke it
+		if (img->type == IMG_DESKTOP && !IsWindows11_24H2OrGreater())
 		{
 			// Get the Real Device Context, then get a non-live copy to read from
 			HWND hwDesktop = GetShellWindow();
+
 			HDC hdcDesktop = GetDC(hwDesktop);
 			HDC hdc = CreateCompatibleDC(hdcDesktop);
 
@@ -1059,4 +1063,39 @@ PLUGIN_EXPORT void Finalize(void *data)
 {
 	Measure *measure = static_cast<Measure*>(data);
 	delete measure;
+}
+
+// Dumb function for dumb broken desktop sampling
+bool isWin1124h2 = false;
+bool isWin1124h2Detected = false;
+#define WIN11_24H2_BUILD 26100
+bool IsWindows11_24H2OrGreater() {
+	// I highly doubt we'll need to detect this literally every time we call this function,
+	// so we cache the value and return that
+	if (isWin1124h2Detected)
+		return isWin1124h2;
+
+	// Get the version info
+	NTSTATUS(WINAPI * RtlGetVersion)(LPOSVERSIONINFOEXW);
+	OSVERSIONINFOEXW versionInfo;
+
+	*(FARPROC*)&RtlGetVersion = GetProcAddress(GetModuleHandleA("ntdll"), "RtlGetVersion");
+
+	if(RtlGetVersion != NULL)
+	{
+		versionInfo = { sizeof(versionInfo) };
+		RtlGetVersion(&versionInfo);
+
+		isWin1124h2 = versionInfo.dwMajorVersion == 10 && versionInfo.dwBuildNumber >= WIN11_24H2_BUILD;
+	}
+	else
+	{
+		// if we couldn't tell, just assume it is because we want to take a
+		// fallback route for 24h2. Don't use this for enabling features!
+		isWin1124h2 = true;
+	}
+
+	isWin1124h2Detected = true;
+
+	return isWin1124h2;
 }
