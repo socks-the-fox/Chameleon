@@ -167,8 +167,8 @@ void SampleImage(std::shared_ptr<Image> img)
 		}
 
 		// Prepare cropping info
-		monitorRect.left = 0;
-		monitorRect.top = 0;
+		monitorRect.left = monInf.rcMonitor.left;
+		monitorRect.top = monInf.rcMonitor.top;
 		monitorRect.right = monInf.rcMonitor.right - monInf.rcMonitor.left;
 		monitorRect.bottom = monInf.rcMonitor.bottom - monInf.rcMonitor.top;
 
@@ -527,6 +527,35 @@ void SampleImage(std::shared_ptr<Image> img)
 		//  Crop image as requested
 		if (img->customCrop)
 		{
+			// Adjust cropping for monitor malarkey thanks to 24H2!
+			if (img->type == IMG_DESKTOP && IsWindows11_24H2OrGreater()) {
+
+				// adjust the cropping rectangle origin from global desktop space to monitor space
+				int xRef = GetSystemMetrics(SM_XVIRTUALSCREEN);
+				int yRef = GetSystemMetrics(SM_YVIRTUALSCREEN);
+
+				actualCropRect.left -= monitorRect.left;
+				actualCropRect.right -= monitorRect.left;
+				actualCropRect.top -= monitorRect.top;
+				actualCropRect.bottom -= monitorRect.top;
+
+				// we assume the image is set to "fill" to keep the code simple
+				// this is just a basic ratio transform of the coordinates from
+				// monitor space to image space
+				float scale = 1.0f;
+				float widthRatio = ((float)w) / ((float)monitorRect.right);
+				float heightRatio = ((float)h) / ((float)monitorRect.bottom);
+				if (widthRatio < heightRatio)
+					scale = widthRatio;
+				else
+					scale = heightRatio;
+
+				actualCropRect.left *= scale;
+				actualCropRect.right *= scale;
+				actualCropRect.top *= scale;
+				actualCropRect.bottom *= scale;
+			}
+
 			uint32_t *croppedData = cropImage(imgData, &w, &h, &actualCropRect);
 			if (croppedData != imgData)
 			{
